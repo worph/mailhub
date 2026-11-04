@@ -81,6 +81,7 @@ msg, kind = save(new_account())
 check("account saved", kind == "confirmation", f"{kind}: {msg}")
 rc = open(RCFILE).read() if os.path.exists(RCFILE) else ""
 check("getmail file written", "server = mailhub-fakeprovider" in rc and "delete = false" in rc, rc)
+check("new account gets its own folder, named after the address", f'override = "admin+{EMAIL}"@mailhub' in rc, rc)
 check("getmail file is private", os.path.exists(RCFILE) and oct(os.stat(RCFILE).st_mode & 0o777) == "0o600")
 idents = req({"_task": "settings", "_action": "identities"})
 check("identity created", EMAIL in idents)
@@ -100,12 +101,12 @@ for _ in range(12):  # the fetcher wakes within ~5 s of the new file
     time.sleep(5)
     with imaplib.IMAP4("mailhub-imap", 31143) as imap:
         imap.login(USER, PASSWORD)
-        imap.select("INBOX", readonly=True)
+        imap.select(f'"{EMAIL}"', readonly=True)
         typ, data = imap.search(None, "SUBJECT", f'"{m["Subject"]}"')
         if data[0].split():
             found = True
             break
-check("mail reached the MailHub inbox", found)
+check(f"mail filed in the {EMAIL} folder", found)
 html = page()
 check("status shows the last fetch", "Last fetch" in html and "OK" in html)
 
@@ -116,11 +117,11 @@ check("delete at source on", "delete = true" in open(RCFILE).read())
 check("identity renamed", "Carol Renamed" in req({"_task": "settings", "_action": "identities"}))
 
 print("== own folder")
-msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][folder]": "bad name"})
-check("folder name with a space refused", kind == "error", f"{kind}: {msg}")
+msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][folder]": "a/b"})
+check("folder name with a / refused (it would nest)", kind == "error", f"{kind}: {msg}")
 msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][folder]": "Contact"})
 check("folder saved", kind == "confirmation", f"{kind}: {msg}")
-check("getmail delivers to admin+Contact", "override = admin+Contact" in open(RCFILE).read())
+check("getmail delivers to admin+Contact", 'override = "admin+Contact"@mailhub' in open(RCFILE).read())
 m = EmailMessage()
 m["From"], m["To"], m["Subject"] = "dave@other.test", EMAIL, f"folder-test {int(time.time())}"
 m.set_content("Should land in the Contact folder.")
@@ -139,6 +140,9 @@ for _ in range(12):
             break
 check("mail filed in the Contact folder", where == "Contact", f"found in {where}")
 check("Contact folder subscribed (shows in the webmail)", where == "Contact" and subscribed)
+
+msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][folder]": ""})
+check("empty folder goes back to the Inbox", kind == "confirmation" and "override = admin\n" in open(RCFILE).read())
 
 print("== remove")
 msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][remove]": "1"})

@@ -176,3 +176,7 @@ passing with Dovecot as vmail again.
   there (created + subscribed on first delivery); `check_all_folders` for unread counts. A `dovecot-reload`
   started step applies a changed `mailhub.conf` (bind-mounted, so an update does not recreate Dovecot).
   Already-fetched mail stays where it is. `accounts-test.py` now 23 checks, all passing on wisera.
+- Folders named after the full address (user request): an unquoted `admin+pierre.henri@aptero.co` makes Dovecot
+  split at the second `@` (user `admin@aptero.co`, folder `pierre.henri`, a stray mailbox). Quoted local part +
+  explicit domain + `auth_username_format = %{user | username | lower}` gives user `admin`, folder
+  `pierre.henri@aptero.co`. New accounts default to it; accounts-test.py 25 checks passing on wisera.

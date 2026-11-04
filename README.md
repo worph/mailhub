@@ -33,9 +33,11 @@ The app itself (compose, seeded config, setup script, rationale) lives in the st
   stops; mail and identity stay). Hand-written getmail files are listed read-only. Settings:
   `mailhub_accounts_dir` (`/var/mailhub/accounts`), `mailhub_fetch_state_dir` (`/var/mailhub/fetch`),
   `mailhub_lmtp_host` / `_port` (`mailhub-imap:2424`), `mailhub_lmtp_user` (the IMAP login).
-- **Per-address folder**: an account can deliver into its own folder (*Folder* field, e.g. `Contact`):
-  getmail hands its mail to `admin+Contact` over LMTP, and Dovecot (`lmtp_save_to_detail_mailbox`, set in
-  the store's `dovecot/mailhub.conf`) files it there. The *saving* message shows while logins are checked.
+- **Per-address folder**: each account delivers into its own folder, named after the address by default
+  (*Folder* field; empty = Inbox). getmail hands its mail to `"admin+<folder>"@mailhub` over LMTP: Dovecot
+  files user+detail into the detail's folder (`lmtp_save_to_detail_mailbox`), the quoted local part lets the
+  folder carry an `@`, and `auth_username_format` drops the domain so it is still user `admin` (both set in
+  the store's `dovecot/mailhub.conf`). The *saving* message shows while logins are checked.
 - **Skins**: [Workbench](https://github.com/AR-Sebastian/roundcube-skin-workbench) (the app's default) and
   [Elastic2022](https://github.com/seb1k/Elastic2022), both CC BY-SA 3.0 like Elastic, pinned by tag in the
   Dockerfile; anyone can switch in *Settings → User interface*. `dev/skin-shots.js` screenshots each skin.
