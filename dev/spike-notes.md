@@ -165,3 +165,14 @@ step (self-signed) for a Maison older than 1.1.92.
 Checked on wisera: picked the wildcard name, sticky on the sslip.io name when that was in use, a planted stale
 certificate replaced by the 10-minute check with Dovecot restarted, IMAPS verified externally, accounts test
 passing with Dovecot as vmail again.
+
+## Feedback round (2026-11-04, after the first real account on mestio)
+
+- Saving an account showed nothing for the seconds the IMAP/SMTP check takes → *Checking the account with
+  its provider…* (Roundcube's loading message) and the Save button disabled meanwhile.
+- Default skin → Workbench (Elastic2022 also installed). Screenshots of both, mail + calendar + settings,
+  render correctly with the Kolab plugins (`dev/skin-shots.js`, puppeteer on the app network).
+- One inbox per address, Outlook-style → per-account *Folder*: delivered to `admin+<folder>`, Dovecot files it
+  there (created + subscribed on first delivery); `check_all_folders` for unread counts. A `dovecot-reload`
+  started step applies a changed `mailhub.conf` (bind-mounted, so an update does not recreate Dovecot).
+  Already-fetched mail stays where it is. `accounts-test.py` now 23 checks, all passing on wisera.

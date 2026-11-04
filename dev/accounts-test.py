@@ -115,6 +115,31 @@ check("edit saved", kind == "confirmation", f"{kind}: {msg}")
 check("delete at source on", "delete = true" in open(RCFILE).read())
 check("identity renamed", "Carol Renamed" in req({"_task": "settings", "_action": "identities"}))
 
+print("== own folder")
+msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][folder]": "bad name"})
+check("folder name with a space refused", kind == "error", f"{kind}: {msg}")
+msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][folder]": "Contact"})
+check("folder saved", kind == "confirmation", f"{kind}: {msg}")
+check("getmail delivers to admin+Contact", "override = admin+Contact" in open(RCFILE).read())
+m = EmailMessage()
+m["From"], m["To"], m["Subject"] = "dave@other.test", EMAIL, f"folder-test {int(time.time())}"
+m.set_content("Should land in the Contact folder.")
+with smtplib.SMTP(PROVIDER, 3025) as s:
+    s.send_message(m)
+where = None
+for _ in range(12):
+    time.sleep(5)
+    with imaplib.IMAP4("mailhub-imap", 31143) as imap:
+        imap.login(USER, PASSWORD)
+        for box in ("Contact", "INBOX"):
+            if imap.select(box, readonly=True)[0] == "OK" and imap.search(None, "SUBJECT", f'"{m["Subject"]}"')[1][0].split():
+                where = box
+        if where:
+            subscribed = any(b'"Contact"' in l or l.endswith(b" Contact") for l in imap.lsub()[1] if l)
+            break
+check("mail filed in the Contact folder", where == "Contact", f"found in {where}")
+check("Contact folder subscribed (shows in the webmail)", where == "Contact" and subscribed)
+
 print("== remove")
 msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][remove]": "1"})
 check("remove saved", kind == "confirmation", f"{kind}: {msg}")
