@@ -8,8 +8,8 @@ The app itself (compose, seeded config, setup script, rationale) lives in the st
 
 | Image | Folder | What it is |
 |---|---|---|
-| `ghcr.io/worph/mailhub-roundcube` | `roundcube/` | Roundcube + Kolab calendar and address book plugins (CalDAV / CardDAV drivers) + identity_smtp (send through each identity's own provider) + our `mailhub_dav` plugin |
-| `ghcr.io/worph/mailhub-getmail` | `getmail/` | getmail6 in a loop: fetches every `/config/*.getmailrc` into Dovecot over LMTP and writes `/state/status/<account>.json` |
+| `ghcr.io/worph/mailhub-roundcube` | `roundcube/` | Roundcube + Kolab calendar and address book plugins (CalDAV / CardDAV drivers) + identity_smtp (send through each identity's own provider) + our `mailhub_dav` and `mailhub_accounts` plugins |
+| `ghcr.io/worph/mailhub-getmail` | `getmail/` | getmail6 in a loop: fetches every `/config/*.getmailrc` into Dovecot over LMTP, within ~5 s of a change to that folder, and writes `/state/status/<account>.json`. Runs as uid 33 (the webmail's www-data), which writes the account files |
 | `ghcr.io/worph/mailhub-mcp` | `mcp/` | MCP server over the unified mailbox (IMAP), calendar (CalDAV) and contacts (CardDAV). Read-only unless `MAILHUB_MCP_WRITE=true`; never sends mail |
 
 ## roundcube
@@ -26,6 +26,13 @@ The app itself (compose, seeded config, setup script, rationale) lives in the st
 - **`plugins/mailhub_dav/`**: loads the calendar and contacts plugins against MailHub's built-in Baïkal,
   or against another CalDAV/CardDAV server set in *Settings → Calendar & contacts* (tested before saving,
   password stored encrypted).
+- **`plugins/mailhub_accounts/`**: *Settings → Mail accounts*. Adding an address (Gmail, Namecheap Private
+  Email, or any IMAP/SMTP provider) tests the IMAP and SMTP logins, writes its getmail file, and creates its
+  identity with the provider's SMTP in identity_smtp's format, in one save. Each account shows its last
+  fetch; it can be renamed, switched to delete-at-source, given a new app password, or removed (fetching
+  stops; mail and identity stay). Hand-written getmail files are listed read-only. Settings:
+  `mailhub_accounts_dir` (`/var/mailhub/accounts`), `mailhub_fetch_state_dir` (`/var/mailhub/fetch`),
+  `mailhub_lmtp_host` / `_port` (`mailhub-imap:2424`), `mailhub_lmtp_user` (the IMAP login).
 - **`post-setup/10-plugin-schemas.php`**: creates and upgrades the plugins' database tables (the official
   image only handles Roundcube's own), with a fix for libkolab's duplicate SQLite index name.
 
@@ -42,7 +49,8 @@ Serves stateless streamable HTTP on `/mcp`. In the app, a beaconify sidecar anno
 
 The spike's test kit. `fakeprovider.compose.yml` runs GreenMail as a fake Gmail / Namecheap on the app's
 network; `accounts/` are the matching getmail accounts. The scripts send test mail and invitations,
-accept one through the webmail, and call the MCP tools. `spike-notes.md` is the spike's log (wisera,
+accept one through the webmail, add/edit/remove an account in Settings → Mail accounts (`accounts-test.py`),
+send as an address through its own SMTP (`send-as-test.py`), and call the MCP tools. `spike-notes.md` is the spike's log (wisera,
 2026-11-04): what was checked, the fixes, the open points. It predates this repo, so it still says
 `images/` for what is now the top-level folders.
 

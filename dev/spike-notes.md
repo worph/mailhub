@@ -138,3 +138,17 @@ the official Beacon app through Maison: discovered within one cycle, all 7 read 
 Test leftovers: a contact "Olivia Organizer", a flagged invitation, a draft in Trash.
 
 Not done: no remote/OAuth path of its own (remote assistants go through Beacon's), no `send` tool by design.
+
+## Mail accounts in Settings (2026-11-04)
+
+`mailhub_accounts` plugin: *Settings → Mail accounts* replaces hand-written getmail files and the
+create-then-edit identity dance. getmail now runs as uid 33 (the webmail's www-data) so the webmail can
+write the private accounts folder; the compose declares both getmail folders `33:33` with
+`recursive: true` (Maison re-owns files from older installs). getmail needs a passwd entry for its uid
+(`getpwuid` in `MDA_qmaillocal`'s defaults), hence the `getmail` user in the image.
+
+Checked on wisera (`dev/accounts-test.py`, 18 checks): bad address and unreachable server refused with
+nothing written; account added → private getmail file + identity with the provider's SMTP; a mail sent to
+it at the fake provider reached the inbox within seconds; status shown; rename + delete-at-source; remove
+(file gone, identity kept). `dev/send-as-test.py`: sending as that identity from the webmail reached the
+provider with the global SMTP pointing at a dead host. Not checked: the page's look in a browser.
