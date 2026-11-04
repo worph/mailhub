@@ -59,9 +59,8 @@ domain); a one-shot compose service (exited container) makes the tile `partial` 
 ## Open points for the real app
 
 - Double login: AppShield SSO, then Roundcube's own login. Dovecot's static passdb + Roundcube `autologon` behind AppShield.
-- Dovecot reads the cert at start: renewals need `doveadm reload` (Caddy renews the wildcard ~every 60 days).
-- The wildcard path (`mesh/data/caddy/.../wildcard_.<domain>/`) is Caddy internals, not a platform contract — ask
-  mesh-router for a supported export, and handle boxes without a wildcard / without a public IP (port 993).
+- ~~Dovecot reads the cert at start: renewals need `doveadm reload`.~~ ~~The wildcard path is Caddy internals,
+  not a platform contract.~~ Solved by Maison 1.1.92 `certificates` (see the section at the end).
 - `/.well-known/caldav` redirects to `http://` (Baïkal nginx behind TLS proxy) — harmless, worth fixing.
 - Roundcube image re-runs `installto` + composer on each start because `/var/www/html` is an anonymous volume: slow start.
 - Real providers not tested yet (Gmail app passwords, Namecheap SMTP, `move_on_delete`/Gmail trash semantics).
@@ -152,3 +151,17 @@ nothing written; account added → private getmail file + identity with the prov
 it at the fake provider reached the inbox within seconds; status shown; rename + delete-at-source; remove
 (file gone, identity kept). `dev/send-as-test.py`: sending as that identity from the webmail reached the
 provider with the global SMTP pointing at a dead host. Not checked: the page's look in a browser.
+
+## IMAPS certificate from Maison (2026-11-04)
+
+Mounting Caddy's storage into Dovecot broke on mestio (zone not delegated: no wildcard, and `<app>.<domain>`
+resolves to Cloudflare) and needed Dovecot as root for the sslip.io cert (root 0600). Replaced by a Maison
+feature (1.1.92): the app declares `certificates: [{route: mailhub, path: tls/, user: 1000, restart:
+[mailhub-imap]}]`; the deployment states `cert-store` in the routing setting; Maison writes the certificate of
+the route's first host that has a public cert and resolves to the box, sticky on `APP_TLS_HOST`, self-signed
+when none, re-checked every 10 min with a Dovecot restart on change. The store compose has a `tls-fallback`
+step (self-signed) for a Maison older than 1.1.92.
+
+Checked on wisera: picked the wildcard name, sticky on the sslip.io name when that was in use, a planted stale
+certificate replaced by the 10-minute check with Dovecot restarted, IMAPS verified externally, accounts test
+passing with Dovecot as vmail again.
