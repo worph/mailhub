@@ -1,0 +1,21 @@
+# Spike account: fake provider (GreenMail) standing in for a real one.
+[retriever]
+type = SimpleIMAPRetriever
+server = mailhub-fakeprovider
+port = 3143
+username = alice@gmail.test
+password = anything
+mailboxes = ("INBOX",)
+
+[destination]
+type = MDA_lmtp
+host = mailhub-imap
+port = 2424
+override = admin
+
+[options]
+read_all = false
+delete = true
+received = false
+delivered_to = false
+message_log_verbose = true

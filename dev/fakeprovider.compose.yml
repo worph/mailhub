@@ -1,0 +1,33 @@
+# Spike only: GreenMail stands in for the mail providers (Gmail, Namecheap…) so the
+# whole loop — fetch, delete at source, send per identity, iMIP reply to an
+# organizer — can be checked without real accounts.
+#
+# Its own compose project, run from OUTSIDE /DATA/AppData (Maison would make a tile
+# of it, and its `up --remove-orphans` on mailhub would delete it if it lived there):
+#   docker compose -f fakeprovider.compose.yml -p mailhub-spike up -d
+name: mailhub-spike
+services:
+  mailhub-fakeprovider:
+    image: greenmail/standalone:2.1.15
+    container_name: mailhub-fakeprovider
+    restart: unless-stopped
+    cpu_shares: 30
+    environment:
+      # auth disabled = any user/password is accepted and mailboxes auto-create
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap
+        -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.auth.disabled -Dgreenmail.verbose
+    expose:
+      - 3025
+      - 3143
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - mailhub-internal
+
+networks:
+  mailhub-internal:
+    name: mailhub_mailhub-internal
+    external: true
