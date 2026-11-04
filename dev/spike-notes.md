@@ -180,3 +180,9 @@ passing with Dovecot as vmail again.
   split at the second `@` (user `admin@aptero.co`, folder `pierre.henri`, a stray mailbox). Quoted local part +
   explicit domain + `auth_username_format = %{user | username | lower}` gives user `admin`, folder
   `pierre.henri@aptero.co`. New accounts default to it; accounts-test.py 25 checks passing on wisera.
+- **Duplicates after an update during a first fetch (mestio, real accounts):** getmail saves its record of
+  fetched messages only when an account's run ends. Two app updates restarted the fetch container during the
+  multi-thousand-message first fetch of a real mailbox, and each new run started over: the Inbox got thousands
+  of duplicates. Fix: `--to-oldmail-on-each-mail` in run.sh (record after every message). Checked on wisera:
+  400 messages, container restarted after 122, result 400 messages / 400 distinct Message-IDs (126 skipped,
+  274 fetched after the restart).
