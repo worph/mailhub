@@ -3,12 +3,16 @@
 # over IMAP, the Cypht spike's Local archive (Dovecot) is an additional account,
 # contacts sync with the Cypht spike's Baïkal over CardDAV. SnappyMail has no calendar.
 # Not a store app.
+# Image: 3.0.0 (5 Nov 2026) fixes unauthenticated SSRFs that the newest published
+# image (djmaze/snappymail:v2.38.2.1) still has, so until v3 is on Docker Hub build
+# the upstream Dockerfile, unchanged, from the tag:
+#   docker build -f .docker/release/Dockerfile -t snappymail:3.0.0 https://github.com/the-djmaze/snappymail.git#v3.0.0
 # Deployed on wisera as /DATA/AppData/snappymail-spike/docker-compose.yml (Maison app);
 # after the first start, dev/snappymail-setup.sh writes the domains and settings.
 name: snappymail-spike
 services:
   snappymail:
-    image: djmaze/snappymail:v2.38.2.1
+    image: snappymail:3.0.0                 # upstream Dockerfile at tag v3.0.0, see above
     container_name: snappymail-spike
     restart: unless-stopped
     cpu_shares: 80
@@ -35,7 +39,7 @@ networks:
 
 x-compose-app:
   schema_version: 2
-  version: "2.38.2.1-spike.1"
+  version: "3.0.0-spike.2"
   id: snappymail-spike
   routes:
     - { service: snappymail, name: snappyspike, upstream-port: 8888 }
@@ -43,5 +47,5 @@ x-compose-app:
     en_us: SnappyMail (spike)
   tagline:
     en_us: Spike - SnappyMail webmail, stock image, for comparison with Cypht and Roundcube.
-  icon: https://raw.githubusercontent.com/the-djmaze/snappymail/v2.38.2.1/snappymail/v/0.0.0/static/apple-touch-icon.png
+  icon: https://raw.githubusercontent.com/the-djmaze/snappymail/v3.0.0/snappymail/v/0.0.0/static/apple-touch-icon.png
   main: snappymail

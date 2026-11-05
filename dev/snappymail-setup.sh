@@ -2,7 +2,7 @@
 # Configures the SnappyMail spike after its first start (the image writes the
 # default application.ini then). Run on the box: sh snappymail-setup.sh [app dir]
 # Needs the Cypht spike running (its Dovecot and Baïkal) and SnappyMail's
-# view-ics plugin source in ./view-ics (from the v2.38.2.1 tag, plugins/view-ics).
+# view-ics plugin source in ./view-ics (from the v3.0.0 tag, plugins/view-ics).
 set -eu
 APP=${1:-/DATA/AppData/snappymail-spike}
 D=$APP/data/_data_/_default_
@@ -24,7 +24,8 @@ ini_set contacts sync_interval 20
 ini_set contacts type '"sqlite"'
 ini_set plugins enable On
 ini_set plugins enabled_list '"view-ics"'
-ini_set security force_https On
+# HTTPS is Caddy's job: since 3.0 force_https ignores X-Forwarded-Proto and loops
+ini_set security force_https Off
 ini_set login sign_me_auto '"DefaultOn"'
 ini_set defaults mail_use_threads On
 
