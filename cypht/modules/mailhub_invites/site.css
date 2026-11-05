@@ -1,0 +1,9 @@
+.mailhub-invite { display: flex; gap: 14px; margin: 12px 16px; padding: 14px 16px; border: 1px solid var(--bs-border-color, #d9dee5); border-radius: 8px; background: var(--bs-tertiary-bg, #f6f7f9); }
+.mailhub-invite-icon { font-size: 1.6rem; line-height: 1; color: var(--bs-primary, #2f5bd3); }
+.mailhub-invite-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mailhub-invite-kind { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--bs-secondary-color, #5b6878); }
+.mailhub-invite-title { font-size: 1.05rem; font-weight: 600; }
+.mailhub-invite-when, .mailhub-invite-where, .mailhub-invite-who { font-size: 0.9rem; overflow-wrap: anywhere; }
+.mailhub-invite-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.mailhub-invite-state { font-size: 0.85rem; color: var(--bs-secondary-color, #5b6878); }
+.mailhub-invite-note { flex-basis: 100%; font-size: 0.8rem; color: var(--bs-secondary-color, #5b6878); }

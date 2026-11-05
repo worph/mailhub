@@ -1,0 +1,128 @@
+# Spike 2026-11-05: Cypht as the mail client, every provider mailbox live over IMAP.
+# Self-contained: Cypht (with MailHub modules), a Dovecot for the Local archive, and
+# Baïkal for calendar and contacts. No fetching, no Roundcube. Not a store app yet.
+# Deployed on wisera as /DATA/AppData/cypht-spike/docker-compose.yml (Maison app),
+# with .scripts/baikal-init.php and baikal/nginx.conf copied from the MailHub app.
+name: cypht-spike
+services:
+  cypht:
+    image: mailhub-cypht:spike            # built from cypht/ in this repo
+    container_name: cypht-spike
+    restart: unless-stopped
+    cpu_shares: 80
+    mem_limit: 512m
+    expose: [80]
+    environment:
+      AUTH_USERNAME: admin
+      AUTH_PASSWORD: "${CYPHT_LOGIN_PASSWORD:-}"
+      AUTH_TYPE: DB
+      DB_DRIVER: sqlite
+      DB_NAME: /var/lib/hm3/db/cypht.sqlite
+      SESSION_TYPE: DB
+      USER_CONFIG_TYPE: DB
+      ENABLE_REDIS: "false"
+      ENABLE_MEMCACHED: "false"
+      DISABLE_IP_CHECK: "true"
+      CYPHT_MODULES: "core,contacts,local_contacts,carddav_contacts,feeds,jmap,imap,smtp,account,idle_timer,desktop_notifications,calendar,themes,nux,profiles,imap_folders,sievefilters,tags,history,scheduled_sends,saved_searches,advanced_search,inline_message,keyboard_shortcuts,pgp,highlights,mailhub_invites"
+      CARD_DAV_SERVER: http://cypht-dav/dav.php
+      # mailhub_invites: where answered invitations go
+      MAILHUB_CALDAV_URL: http://cypht-dav/dav.php/calendars/admin/default/
+      MAILHUB_CALDAV_USER: admin
+      MAILHUB_CALDAV_PASSWORD: "${SPIKE_PASSWORD}"
+      DEFAULT_SETTING_TIMEZONE: Europe/Paris
+      DEFAULT_SETTING_INLINE_MESSAGE: "true"
+      DEFAULT_SETTING_ALL_SINCE: "-1 month"
+      DEFAULT_SETTING_UNREAD_SINCE: "-1 month"
+      DEFAULT_SETTING_ALL_EMAIL_SINCE: "-1 month"
+    volumes:
+      - ./data:/var/lib/hm3/db
+      - ./users:/var/lib/hm3/users
+      - ./attachments:/var/lib/hm3/attachments
+    networks: [pcs, internal]
+
+  # The Local archive: mail moved out of the providers lands here. Internal only
+  # for now (phones and Thunderbird on it are priority 4).
+  cypht-imap:
+    image: dovecot/dovecot:2.4.5
+    container_name: cypht-spike-imap
+    restart: unless-stopped
+    cpu_shares: 50
+    mem_limit: 256m
+    environment:
+      USER_PASSWORD: "${SPIKE_PASSWORD}"
+      TZ: Etc/UTC
+    expose: [31143]
+    volumes:
+      - ./mail:/srv/vmail
+    healthcheck:
+      test: ["CMD-SHELL", "r=$$(printf 'a LOGOUT\\r\\n' | nc -w 3 127.0.0.1 31143); case \"$$r\" in '* OK'*) exit 0;; esac; exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks: [internal]
+
+  # Calendar and contacts. Routed for phones (Basic auth, the mailbox login).
+  cypht-dav:
+    image: ckulka/baikal:0.10.1-nginx
+    container_name: cypht-spike-dav
+    restart: unless-stopped
+    cpu_shares: 50
+    mem_limit: 128m
+    expose: [80]
+    volumes:
+      - ./baikal/config:/var/www/baikal/config
+      - ./baikal/data:/var/www/baikal/Specific
+      - ./baikal/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "[ \"$$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/dav.php)\" = 401 ]"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks: [pcs, internal]
+
+networks:
+  pcs: {name: pcs, external: true}
+  internal: {name: cypht-spike-internal}
+
+x-compose-app:
+  schema_version: 2
+  version: "2.13.1-spike.2"
+  id: cypht-spike
+  routes:
+    - { service: cypht, name: cyphtspike, upstream-port: 80 }
+    - { service: cypht-dav, name: cyphtdav, upstream-port: 80 }
+  title:
+    en_us: Cypht (spike)
+  tagline:
+    en_us: Spike - every mail account in one web client, two-way, with a Local archive.
+  icon: https://raw.githubusercontent.com/cypht-org/cypht/v2.13.1/modules/core/assets/images/logo.svg
+  main: cypht
+  secrets:
+    SPIKE_PASSWORD: password:24
+    SPIKE_DAV_ADMIN_PASSWORD: hex:32
+  folders:
+    - path: /DATA/AppData/$AppID/mail
+      user: "1000"
+      group: "1000"
+      mode: "0700"
+    - path: /DATA/AppData/$AppID/baikal/config
+      user: "101"
+      group: "101"
+    - path: /DATA/AppData/$AppID/baikal/data
+      user: "101"
+      group: "101"
+  steps:
+    - name: baikal-init
+      at: setup
+      run: always
+      images: [ckulka/baikal:0.10.1-nginx]
+      script: |
+        export BAIKAL_USER_PASSWORD="$SPIKE_PASSWORD" BAIKAL_ADMIN_PASSWORD="$SPIKE_DAV_ADMIN_PASSWORD"
+        docker run --rm --network none --entrypoint php \
+          -e BAIKAL_USER=admin -e BAIKAL_USER_PASSWORD -e BAIKAL_ADMIN_PASSWORD \
+          -v "$APP_DIR/.scripts/baikal-init.php:/init/init.php:ro" \
+          -v "$APP_DIR/baikal/config:/var/www/baikal/config" \
+          -v "$APP_DIR/baikal/data:/var/www/baikal/Specific" \
+          ckulka/baikal:0.10.1-nginx /init/init.php
