@@ -1,0 +1,47 @@
+# Spike 2026-11-05: SnappyMail as a third web client to compare with Cypht and
+# Roundcube. Stock image only, no MailHub code: the provider mailbox is read live
+# over IMAP, the Cypht spike's Local archive (Dovecot) is an additional account,
+# contacts sync with the Cypht spike's Baïkal over CardDAV. SnappyMail has no calendar.
+# Not a store app.
+# Deployed on wisera as /DATA/AppData/snappymail-spike/docker-compose.yml (Maison app);
+# after the first start, dev/snappymail-setup.sh writes the domains and settings.
+name: snappymail-spike
+services:
+  snappymail:
+    image: djmaze/snappymail:v2.38.2.1
+    container_name: snappymail-spike
+    restart: unless-stopped
+    cpu_shares: 80
+    mem_limit: 256m
+    expose: [8888]
+    environment:
+      UPLOAD_MAX_SIZE: 25M
+      MEMORY_LIMIT: 128M
+      SECURE_COOKIES: "true"
+    volumes:
+      - ./data:/var/lib/snappymail
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8888/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # cypht-spike-internal: to reach the Local archive (cypht-spike-imap)
+    networks: [pcs, cypht]
+
+networks:
+  pcs: {name: pcs, external: true}
+  cypht: {name: cypht-spike-internal, external: true}
+
+x-compose-app:
+  schema_version: 2
+  version: "2.38.2.1-spike.1"
+  id: snappymail-spike
+  routes:
+    - { service: snappymail, name: snappyspike, upstream-port: 8888 }
+  title:
+    en_us: SnappyMail (spike)
+  tagline:
+    en_us: Spike - SnappyMail webmail, stock image, for comparison with Cypht and Roundcube.
+  icon: https://raw.githubusercontent.com/the-djmaze/snappymail/v2.38.2.1/snappymail/v/0.0.0/static/apple-touch-icon.png
+  main: snappymail
