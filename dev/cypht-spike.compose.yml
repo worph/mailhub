@@ -29,7 +29,7 @@ services:
       ENABLE_REDIS: "false"
       ENABLE_MEMCACHED: "false"
       DISABLE_IP_CHECK: "true"
-      CYPHT_MODULES: "core,contacts,local_contacts,carddav_contacts,feeds,jmap,imap,smtp,account,idle_timer,desktop_notifications,calendar,themes,nux,profiles,imap_folders,sievefilters,tags,history,scheduled_sends,saved_searches,advanced_search,inline_message,keyboard_shortcuts,pgp,highlights,api_login,gateway,mailhub_invites"
+      CYPHT_MODULES: "core,contacts,local_contacts,carddav_contacts,feeds,jmap,imap,smtp,account,idle_timer,desktop_notifications,themes,nux,profiles,imap_folders,sievefilters,tags,history,scheduled_sends,saved_searches,advanced_search,inline_message,keyboard_shortcuts,pgp,highlights,api_login,gateway,mailhub_invites,mailhub_calendar"
       CARD_DAV_SERVER: http://cypht-dav/dav.php
       # mailhub_invites: where answered invitations go
       MAILHUB_CALDAV_URL: http://cypht-dav/dav.php/calendars/admin/default/

@@ -6,16 +6,9 @@ if (!defined('DEBUG_MODE')) { die(); }
 
 use Sabre\VObject;
 
-/* ---------- helpers ---------- */
+require_once APP_PATH . 'modules/mailhub_common/caldav.php';
 
-if (!hm_exists('mailhub_env')) {
-function mailhub_env($key, $default = '') {
-    $v = getenv($key);
-    if ($v === false || $v === '') {
-        $v = function_exists('env') ? env($key, $default) : $default;
-    }
-    return $v === null ? $default : $v;
-}}
+/* ---------- helpers ---------- */
 
 /** Part numbers of the calendar parts of a message (text/calendar, application/ics). */
 if (!hm_exists('mailhub_calendar_parts')) {
@@ -115,35 +108,6 @@ function mailhub_my_attendee($ev, $mine) {
 }}
 
 /* ---------- CalDAV ---------- */
-
-if (!hm_exists('mailhub_caldav')) {
-function mailhub_caldav($method, $href, $body = null, $headers = array()) {
-    $base = rtrim(mailhub_env('MAILHUB_CALDAV_URL'), '/') . '/';
-    if ($base === '/') {
-        return array(0, 'MAILHUB_CALDAV_URL is not set');
-    }
-    $parts = parse_url($base);
-    $url = preg_match('#^https?://#', $href) ? $href
-        : ($href !== '' && $href[0] === '/' ? $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '') . $href : $base . $href);
-    $ch = curl_init($url);
-    curl_setopt_array($ch, array(
-        CURLOPT_CUSTOMREQUEST => $method,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPAUTH => CURLAUTH_ANY,
-        CURLOPT_USERPWD => mailhub_env('MAILHUB_CALDAV_USER') . ':' . mailhub_env('MAILHUB_CALDAV_PASSWORD'),
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_CONNECTTIMEOUT => 5,
-        CURLOPT_TIMEOUT => 20,
-    ));
-    if ($body !== null) {
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-    }
-    $res = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-    $err = curl_error($ch);
-    curl_close($ch);
-    return array((int) $code, $res === false ? $err : $res);
-}}
 
 /** The calendar object holding this UID: [href, VCalendar] or [null, null]. */
 if (!hm_exists('mailhub_caldav_find')) {

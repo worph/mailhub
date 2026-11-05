@@ -1,6 +1,7 @@
 # Cypht with MailHub's modules. Upstream image, plus:
 #  - sabre/vobject, for reading and answering invitations (mailhub_invites);
-#  - our module sets under modules/mailhub_* (enabled through CYPHT_MODULES);
+#  - our module sets under modules/mailhub_* (enabled through CYPHT_MODULES), with
+#    FullCalendar (MIT) for mailhub_calendar's page, fetched by version and checksum;
 #  - no Xdebug: the upstream image loads the debugger in production;
 #  - a SQLite file the web server can write (upstream creates it as root);
 #  - TLS certificates checked for every mail server with a dotted host name (upstream checks none);
@@ -32,6 +33,12 @@ COPY --from=gateway /src/docker/cypht-gateway-config.php config/gateway.php
 RUN printf 'auto_prepend_file=/usr/local/share/cypht/modules/gateway/bootstrap.php\n' > /usr/local/etc/php/conf.d/cypht-gateway.ini
 
 COPY modules/ modules/
+ARG FULLCALENDAR_VERSION=6.1.22
+ARG FULLCALENDAR_SHA256=65f927f1802cb35428b9c5e2a8d2276633880a89ee5ea5f9a7727f79892786ea
+RUN mkdir -p modules/mailhub_calendar/assets \
+ && curl -fsSL -o modules/mailhub_calendar/assets/fullcalendar.min.js \
+      "https://cdn.jsdelivr.net/npm/fullcalendar@${FULLCALENDAR_VERSION}/index.global.min.js" \
+ && echo "${FULLCALENDAR_SHA256}  modules/mailhub_calendar/assets/fullcalendar.min.js" | sha256sum -c -
 COPY mailhub-entrypoint.sh /usr/local/bin/mailhub-entrypoint.sh
 RUN chmod +x /usr/local/bin/mailhub-entrypoint.sh
 

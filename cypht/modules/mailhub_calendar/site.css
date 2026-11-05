@@ -1,0 +1,8 @@
+.mailhub-calendar .mailhub-cal { padding: 8px 16px 16px; --fc-border-color: var(--bs-border-color, #dee2e6); --fc-today-bg-color: var(--bs-primary-bg-subtle, rgba(47,111,219,.08)); --fc-page-bg-color: var(--bs-body-bg, #fff); --fc-neutral-bg-color: var(--bs-tertiary-bg, #f6f7f9); --fc-list-event-hover-bg-color: var(--bs-tertiary-bg, #f6f7f9); }
+.mailhub-calendar .fc .fc-toolbar-title { font-size: 1.15rem; font-weight: 600; }
+.mailhub-calendar .fc .fc-button { font-size: .85rem; padding: .3rem .6rem; }
+.mailhub-calendar .fc-event { cursor: pointer; }
+.mailhub-calendar .mailhub-cal-tentative { opacity: .7; background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255,255,255,.35) 6px 12px); }
+.mailhub-calendar .mailhub-cal-cancelled .fc-event-title, .mailhub-calendar .mailhub-cal-cancelled .fc-list-event-title { text-decoration: line-through; }
+@media (max-width: 767px) { .mailhub-calendar .mailhub-cal { padding: 4px 6px 12px; } .mailhub-calendar .fc .fc-toolbar { gap: 6px; flex-wrap: wrap; } }
+.mailhub-calendar .fc .fc-prev-button, .mailhub-calendar .fc .fc-next-button { font-size: 1.25rem; line-height: 1; padding: .15rem .7rem .3rem; }
