@@ -2,14 +2,34 @@
 #  - sabre/vobject, for reading and answering invitations (mailhub_invites);
 #  - our module sets under modules/mailhub_* (enabled through CYPHT_MODULES);
 #  - no Xdebug: the upstream image loads the debugger in production;
-#  - a SQLite file the web server can write (upstream creates it as root).
+#  - a SQLite file the web server can write (upstream creates it as root);
+#  - TLS certificates checked for every mail server with a dotted host name (upstream checks none);
+#    a bare compose service name (cypht-imap, a test catcher) stays unchecked, it never leaves the host;
+#  - the private bridge of cypht-gateway (github.com/ashanzzz/cypht-gateway), which lets the gateway
+#    and its MCP server use the accounts configured here. Enabled with `api_login,gateway` in CYPHT_MODULES.
 ARG CYPHT_VERSION=2.13.1
+ARG CYPHT_GATEWAY_VERSION=0.6.0
+
+FROM alpine/git:v2.47.2 AS gateway
+ARG CYPHT_GATEWAY_VERSION
+RUN git clone --depth 1 --branch "v${CYPHT_GATEWAY_VERSION}" https://github.com/ashanzzz/cypht-gateway.git /src
+
 FROM cypht/cypht:${CYPHT_VERSION}
 
 WORKDIR /usr/local/share/cypht
 ARG SABRE_VOBJECT_VERSION=4.5.6
 RUN composer require --no-interaction --no-progress --update-no-dev "sabre/vobject:${SABRE_VOBJECT_VERSION}" \
  && rm -f /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
+
+RUN set -e; \
+    sed -i 's/\$this->verify_peer_name);/$this->verify_peer_name || strpos($this->server, ".") !== false);/; s/\$this->verify_peer);/$this->verify_peer || strpos($this->server, ".") !== false);/' modules/imap/hm-imap.php; \
+    sed -i "s/'verify_peer_name', false);/'verify_peer_name', strpos(\$server, '.') !== false);/; s/'verify_peer', false);/'verify_peer', strpos(\$server, '.') !== false);/" modules/smtp/hm-smtp.php; \
+    test "$(grep -c 'strpos($this->server, ".") !== false' modules/imap/hm-imap.php)" = 2; \
+    test "$(grep -c "strpos(\$server, '.') !== false" modules/smtp/hm-smtp.php)" = 2
+
+COPY --from=gateway /src/cypht-module/gateway modules/gateway
+COPY --from=gateway /src/docker/cypht-gateway-config.php config/gateway.php
+RUN printf 'auto_prepend_file=/usr/local/share/cypht/modules/gateway/bootstrap.php\n' > /usr/local/etc/php/conf.d/cypht-gateway.ini
 
 COPY modules/ modules/
 COPY mailhub-entrypoint.sh /usr/local/bin/mailhub-entrypoint.sh

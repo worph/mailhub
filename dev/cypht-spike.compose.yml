@@ -1,6 +1,12 @@
 # Spike 2026-11-05: Cypht as the mail client, every provider mailbox live over IMAP.
-# Self-contained: Cypht (with MailHub modules), a Dovecot for the Local archive, and
-# Baïkal for calendar and contacts. No fetching, no Roundcube. Not a store app yet.
+# Self-contained: Cypht (with MailHub modules), a Dovecot for the Local archive,
+# Baïkal for calendar and contacts, and cypht-gateway (REST + MCP over the accounts
+# configured in Cypht, announced to Beacon by beaconify). No fetching, no Roundcube.
+# Not a store app yet.
+# The gateway image is built from upstream, there is no public one:
+#   docker build -t cypht-gateway:0.6.0 https://github.com/ashanzzz/cypht-gateway.git#v0.6.0
+# The MCP needs a gateway token (PAT) in .env as CYPHT_GATEWAY_PAT: log in on the
+# gateway UI (cyphtgw route, the Cypht login) and create one with read scopes.
 # Deployed on wisera as /DATA/AppData/cypht-spike/docker-compose.yml (Maison app),
 # with .scripts/baikal-init.php and baikal/nginx.conf copied from the MailHub app.
 name: cypht-spike
@@ -23,12 +29,16 @@ services:
       ENABLE_REDIS: "false"
       ENABLE_MEMCACHED: "false"
       DISABLE_IP_CHECK: "true"
-      CYPHT_MODULES: "core,contacts,local_contacts,carddav_contacts,feeds,jmap,imap,smtp,account,idle_timer,desktop_notifications,calendar,themes,nux,profiles,imap_folders,sievefilters,tags,history,scheduled_sends,saved_searches,advanced_search,inline_message,keyboard_shortcuts,pgp,highlights,mailhub_invites"
+      CYPHT_MODULES: "core,contacts,local_contacts,carddav_contacts,feeds,jmap,imap,smtp,account,idle_timer,desktop_notifications,calendar,themes,nux,profiles,imap_folders,sievefilters,tags,history,scheduled_sends,saved_searches,advanced_search,inline_message,keyboard_shortcuts,pgp,highlights,api_login,gateway,mailhub_invites"
       CARD_DAV_SERVER: http://cypht-dav/dav.php
       # mailhub_invites: where answered invitations go
       MAILHUB_CALDAV_URL: http://cypht-dav/dav.php/calendars/admin/default/
       MAILHUB_CALDAV_USER: admin
       MAILHUB_CALDAV_PASSWORD: "${SPIKE_PASSWORD}"
+      # cypht-gateway's bridge: two different secrets, shared with the gateway
+      API_LOGIN_KEY: "${CYPHT_API_LOGIN_KEY}"
+      GATEWAY_BRIDGE_KEY: "${CYPHT_BRIDGE_KEY}"
+      GATEWAY_INTERNAL_URL: http://cypht-spike-gateway:8080
       DEFAULT_SETTING_TIMEZONE: Europe/Paris
       DEFAULT_SETTING_INLINE_MESSAGE: "true"
       DEFAULT_SETTING_ALL_SINCE: "-1 month"
@@ -82,17 +92,81 @@ services:
       start_period: 30s
     networks: [pcs, internal]
 
+  # REST API, CLI target and management UI (tokens, audit) over Cypht's accounts.
+  # Talks to Cypht's private bridge pages with the shared keys; mail stays in Cypht.
+  cypht-gateway:
+    image: cypht-gateway:0.6.0
+    container_name: cypht-spike-gateway
+    restart: unless-stopped
+    cpu_shares: 50
+    mem_limit: 128m
+    expose: [8080]
+    environment:
+      GATEWAY_BIND: 0.0.0.0:8080
+      GATEWAY_DB_PATH: /var/lib/cypht-gateway/gateway.db
+      GATEWAY_MASTER_KEY: "${CYPHT_GATEWAY_MASTER_KEY}"
+      CYPHT_BASE_URL: http://cypht-spike/
+      CYPHT_API_LOGIN_KEY: "${CYPHT_API_LOGIN_KEY}"
+      CYPHT_BRIDGE_KEY: "${CYPHT_BRIDGE_KEY}"
+      RUST_LOG: gatewayd=info,tower_http=info
+    volumes:
+      - ./gateway:/var/lib/cypht-gateway
+    networks: [pcs, internal]
+
+  # MCP over the gateway (streamable HTTP). Read-only: write tools are hidden
+  # unless CYPHT_MCP_ALLOW_WRITE=true, and the caller's token scopes still apply.
+  cypht-mcp:
+    image: cypht-gateway:0.6.0
+    container_name: cypht-spike-mcp
+    restart: unless-stopped
+    cpu_shares: 30
+    mem_limit: 64m
+    entrypoint: ["/usr/local/bin/cypht-mcp"]
+    command: [--transport, http, --bind, "0.0.0.0:8790",
+              --allowed-host, cypht-spike-mcp, --allowed-host, "cypht-spike-mcp:8790"]
+    environment:
+      CYPHT_GATEWAY_URL: http://cypht-spike-gateway:8080
+      CYPHT_MCP_ALLOW_WRITE: "false"
+      RUST_LOG: cypht_mcp=info
+    expose: [8790]
+    depends_on: [cypht-gateway]
+    networks: [internal]
+
+  # Announces the MCP to Beacon and adds the gateway token to each call.
+  cypht-beacon:
+    image: ghcr.io/worph/beaconify:1.0.2
+    container_name: cypht-spike-beacon
+    hostname: cypht-spike-beacon
+    restart: unless-stopped
+    cpu_shares: 20
+    mem_limit: 128m
+    expose: [9099]
+    environment:
+      BEACONIFY_NAME: cypht
+      BEACONIFY_DESCRIPTION: "Cypht (spike) — every mail account configured in Cypht: list, search, read (via cypht-gateway)"
+      BEACONIFY_UPSTREAM_URL: http://cypht-spike-mcp:8790/mcp
+      BEACONIFY_AUTH: "Bearer ${CYPHT_GATEWAY_PAT:-}"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9099/healthz"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on: [cypht-mcp]
+    networks: [pcs, internal]
+
 networks:
   pcs: {name: pcs, external: true}
   internal: {name: cypht-spike-internal}
 
 x-compose-app:
   schema_version: 2
-  version: "2.13.1-spike.2"
+  version: "2.13.1-spike.3"
   id: cypht-spike
   routes:
     - { service: cypht, name: cyphtspike, upstream-port: 80 }
     - { service: cypht-dav, name: cyphtdav, upstream-port: 80 }
+    - { service: cypht-gateway, name: cyphtgw, upstream-port: 8080 }
   title:
     en_us: Cypht (spike)
   tagline:
@@ -102,10 +176,17 @@ x-compose-app:
   secrets:
     SPIKE_PASSWORD: password:24
     SPIKE_DAV_ADMIN_PASSWORD: hex:32
+    CYPHT_API_LOGIN_KEY: hex:32
+    CYPHT_BRIDGE_KEY: hex:32
+    CYPHT_GATEWAY_MASTER_KEY: base64:32
   folders:
     - path: /DATA/AppData/$AppID/mail
       user: "1000"
       group: "1000"
+      mode: "0700"
+    - path: /DATA/AppData/$AppID/gateway
+      user: "10001"
+      group: "10001"
       mode: "0700"
     - path: /DATA/AppData/$AppID/baikal/config
       user: "101"
