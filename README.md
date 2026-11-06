@@ -44,8 +44,8 @@ version is published upstream), on a push to main that changes that file or by h
   stops; mail and identity stay). Hand-written getmail files are listed read-only. Settings:
   `mailhub_accounts_dir` (`/var/mailhub/accounts`), `mailhub_fetch_state_dir` (`/var/mailhub/fetch`),
   `mailhub_lmtp_host` / `_port` (`mailhub-imap:2424`), `mailhub_lmtp_user` (the IMAP login).
-- **Per-address folder**: each account delivers into its own folder, named after the address by default
-  (*Folder* field; empty = Inbox). getmail hands its mail to `"admin+<folder>"@mailhub` over LMTP: Dovecot
+- **Per-address folder**: each account delivers into its own folder, named after the address
+  (no longer a setting). getmail hands its mail to `"admin+<folder>"@mailhub` over LMTP: Dovecot
   files user+detail into the detail's folder (`lmtp_save_to_detail_mailbox`), the quoted local part lets the
   folder carry an `@`, and `auth_username_format` drops the domain so it is still user `admin` (both set in
   the store's `dovecot/mailhub.conf`). The *saving* message shows while logins are checked.

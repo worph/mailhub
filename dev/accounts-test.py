@@ -118,33 +118,10 @@ check("delete at source ignored (IMAP only, never deletes)", "delete = false" in
 check("no delete option on the page", "_delete" not in page())
 check("identity renamed", "Carol Renamed" in req({"_task": "settings", "_action": "identities"}))
 
-print("== own folder")
-msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][folder]": "a/b"})
-check("folder name with a / refused (it would nest)", kind == "error", f"{kind}: {msg}")
+print("== folder is no longer a setting")
+check("no Folder field on the page", "_folder" not in page())
 msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][folder]": "Contact"})
-check("folder saved", kind == "confirmation", f"{kind}: {msg}")
-check("getmail delivers to admin+Contact", 'override = "admin+Contact"@mailhub' in open(RCFILE).read())
-m = EmailMessage()
-m["From"], m["To"], m["Subject"] = "dave@other.test", EMAIL, f"folder-test {int(time.time())}"
-m.set_content("Should land in the Contact folder.")
-with smtplib.SMTP(PROVIDER, 3025) as s:
-    s.send_message(m)
-where = None
-for _ in range(12):
-    time.sleep(5)
-    with imaplib.IMAP4("mailhub-imap", 31143) as imap:
-        imap.login(USER, PASSWORD)
-        for box in ("Contact", "INBOX"):
-            if imap.select(box, readonly=True)[0] == "OK" and imap.search(None, "SUBJECT", f'"{m["Subject"]}"')[1][0].split():
-                where = box
-        if where:
-            subscribed = any(b'"Contact"' in l or l.endswith(b" Contact") for l in imap.lsub()[1] if l)
-            break
-check("mail filed in the Contact folder", where == "Contact", f"found in {where}")
-check("Contact folder subscribed (shows in the webmail)", where == "Contact" and subscribed)
-
-msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][folder]": ""})
-check("empty folder goes back to the Inbox", kind == "confirmation" and "override = admin\n" in open(RCFILE).read())
+check("a posted folder is ignored", kind == "confirmation" and f'override = "admin+{EMAIL}"@mailhub' in open(RCFILE).read())
 
 print("== remove")
 msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][remove]": "1"})
