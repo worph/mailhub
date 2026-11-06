@@ -11,7 +11,8 @@ has to be built into an image.
 | Image | Folder | What it is |
 |---|---|---|
 | `ghcr.io/worph/mailhub-roundcube` | `roundcube/` | Roundcube + Kolab calendar and address book plugins (CalDAV / CardDAV drivers) + identity_smtp (send through each identity's own provider) + our `mailhub_dav` and `mailhub_accounts` plugins |
-| `ghcr.io/worph/mailhub-getmail` | `getmail/` | getmail6 in a loop: fetches every `/config/*.getmailrc` into Dovecot over LMTP, within ~5 s of a change to that folder, and writes `/state/status/<account>.json`. Runs as uid 33 (the webmail's www-data), which writes the account files |
+| `ghcr.io/worph/mailhub-mirror` | `mirror/` | Every provider mailbox as a local copy under `Live/<address>/`: mbsync pull only (nothing in that direction writes to the provider), the IMAP actions done there (recorded by the store's Dovecot Lua hook) replayed at the provider as the same commands, `Virtual/All inboxes`, `Unread`, `Flagged` regenerated from the accounts and folders that exist, a status per account for Settings → Mail accounts. Replaced getmail in the app with 0.4.0 |
+| `ghcr.io/worph/mailhub-getmail` | `getmail/` | (before 0.4.0) getmail6 in a loop, copying each provider's INBOX into Dovecot over LMTP. No longer used by the app nor built by CI |
 | `ghcr.io/worph/mailhub-mcp` | `mcp/` | MCP server over the unified mailbox (IMAP), calendar (CalDAV) and contacts (CardDAV). Read-only unless `MAILHUB_MCP_WRITE=true`; never sends mail |
 | `ghcr.io/worph/mailhub-cypht` | `cypht/` | Official Cypht image + `mailhub_invites` (Accept / Maybe / Decline, written to CalDAV, reply to the organizer), `mailhub_calendar` (CalDAV calendar page, FullCalendar), cypht-gateway's bridge module, TLS certificate checks for public mail servers, no Xdebug. Used by the Cypht app |
 
@@ -38,17 +39,12 @@ version is published upstream), on a push to main that changes that file or by h
   or against another CalDAV/CardDAV server set in *Settings → Calendar & contacts* (tested before saving,
   password stored encrypted).
 - **`plugins/mailhub_accounts/`**: *Settings → Mail accounts*. Adding an address (Gmail, Namecheap Private
-  Email, or any IMAP/SMTP provider) tests the IMAP and SMTP logins, writes its getmail file, and creates its
-  identity with the provider's SMTP in identity_smtp's format, in one save. Each account shows its last
-  fetch; it can be renamed, given a new app password, or removed (fetching
-  stops; mail and identity stay). Hand-written getmail files are listed read-only. Settings:
-  `mailhub_accounts_dir` (`/var/mailhub/accounts`), `mailhub_fetch_state_dir` (`/var/mailhub/fetch`),
-  `mailhub_lmtp_host` / `_port` (`mailhub-imap:2424`), `mailhub_lmtp_user` (the IMAP login).
-- **Per-address folder**: each account delivers into its own folder, named after the address
-  (no longer a setting). getmail hands its mail to `"admin+<folder>"@mailhub` over LMTP: Dovecot
-  files user+detail into the detail's folder (`lmtp_save_to_detail_mailbox`), the quoted local part lets the
-  folder carry an `@`, and `auth_username_format` drops the domain so it is still user `admin` (both set in
-  the store's `dovecot/mailhub.conf`). The *saving* message shows while logins are checked.
+  Email, or any IMAP/SMTP provider) tests the IMAP and SMTP logins, writes its mirror account file
+  (`<slug>.json`, 0600) and creates its identity with the provider's SMTP in identity_smtp's format, in one
+  save. Each account shows the mirror's status (download progress while a sync runs); it can be renamed,
+  given a new app password, or removed (the mirror stops and deletes this server's copy; nothing is deleted
+  at the provider, the identity stays). Settings: `mailhub_accounts_dir` (`/var/mailhub/accounts`),
+  `mailhub_mirror_state_dir` (`/var/mailhub/mirror`).
 - **Skins**: 11 to choose from in *Settings → User interface*, the app's default being
   [Elastic2022](https://github.com/seb1k/Elastic2022): Roundcube's Elastic,
   [Workbench](https://github.com/AR-Sebastian/roundcube-skin-workbench),

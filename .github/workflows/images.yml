@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [roundcube, getmail, mcp, cypht]
+        image: [roundcube, mirror, mcp, cypht]
     steps:
       - uses: actions/checkout@v4
 

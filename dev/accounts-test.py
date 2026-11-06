@@ -1,14 +1,17 @@
-"""Drive Settings → Mail accounts (mailhub_accounts) over HTTP, against the fake provider.
+"""Drive Settings → Mail accounts (mailhub_accounts) over HTTP against the fake provider
+(GreenMail, dev/fakeprovider.compose.yml), and check what mailhub-mirror does with it.
 
-1. refused: invalid address, unreachable IMAP server
-2. add carol@gmail.test (Other provider = GreenMail, unencrypted) → getmail file, identity + SMTP
-3. a mail sent to carol at the provider reaches the MailHub inbox within seconds
-4. the page shows the fetch status; edit (name; a posted delete-at-source is ignored, IMAP only); remove
+1. refused: invalid address, unreachable IMAP server; nothing written
+2. add carol@gmail.test (Other provider = GreenMail, unencrypted) → account file, identity + SMTP
+3. a message already at the provider is copied to Live/carol@gmail.test/INBOX; a new one arrives
+   after a save on the page (which wakes the mirror); All inboxes shows it; the status says so
+4. replay: flagging the local copy flags the message at the provider
+5. remove: the local copy is deleted, the provider keeps every message
 
-Run inside a container on mailhub-internal that sees the accounts folder at /config,
-e.g. mailhub-fetch:  python accounts-test.py <mailbox password>
+Run inside mailhub-mirror (it sees the account files at /accounts):
+    docker exec mailhub-mirror python3 /tmp/accounts-test.py <mailbox password>
 """
-import http.cookiejar, imaplib, os, re, smtplib, sys, time, urllib.parse, urllib.request
+import http.cookiejar, imaplib, json, os, re, smtplib, sys, time, urllib.parse, urllib.request
 from email.message import EmailMessage
 
 RC = "http://mailhub-webmail/"
@@ -16,7 +19,8 @@ USER, PASSWORD = "admin", sys.argv[1]
 PROVIDER = "mailhub-fakeprovider"
 EMAIL = "carol@gmail.test"
 SLUG = "carol_at_gmail.test"
-RCFILE = f"/config/{SLUG}.getmailrc"
+ACCFILE = f"/accounts/{SLUG}.json"
+LIVE = f"Live/{EMAIL}/INBOX"
 
 jar = http.cookiejar.CookieJar()
 web = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
@@ -67,22 +71,63 @@ req({"_task": "login", "_action": "login"},
     {"_token": tok, "_task": "login", "_action": "login", "_timezone": "UTC", "_user": USER, "_pass": PASSWORD})
 html = page()
 check("settings page renders", "Add an account" in html and "mh_preset" in html, html[:300])
-check("hand-written accounts listed read-only", "alice_at_gmail.test" in html or "gmail1" in html)
+check("no Folder or Delete-from-provider option", "_folder" not in html and "_delete" not in html)
+
+
+def provider():
+    m = imaplib.IMAP4(PROVIDER, 3143)
+    m.login(EMAIL, "app-pass")
+    return m
+
+
+def local():
+    m = imaplib.IMAP4("mailhub-imap", 31143)
+    m.login(USER, PASSWORD)
+    return m
+
+
+def send(subject):
+    m = EmailMessage()
+    m["From"], m["To"], m["Subject"] = "dave@other.test", EMAIL, subject
+    m.set_content("Mirrored by an account added from Settings.")
+    with smtplib.SMTP(PROVIDER, 3025) as s:
+        s.send_message(m)
+
+
+def find(box, subject, tries=30):
+    for _ in range(tries):
+        try:
+            with local() as imap:
+                if imap.select(f'"{box}"', readonly=True)[0] == "OK":
+                    hits = imap.search(None, "SUBJECT", f'"{subject}"')[1][0].split()
+                    if hits:
+                        return hits
+        except imaplib.IMAP4.error:
+            pass
+        time.sleep(5)
+    return []
+
+
+if SLUG in html:  # left over from an earlier run
+    save({f"_acc[{SLUG}][name]": "x", f"_acc[{SLUG}][remove]": "1"})
+    time.sleep(10)
 
 print("== refused")
 msg, kind = save(new_account(email="not-an-address"))
 check("invalid address refused", kind == "error" and "valid email" in msg, f"{kind}: {msg}")
 msg, kind = save(new_account(imap_host="nothing.invalid"))
 check("unreachable IMAP refused", kind == "error" and "could not be reached" in msg, f"{kind}: {msg}")
-check("nothing written after a refusal", not os.path.exists(RCFILE))
+check("nothing written after a refusal", not os.path.exists(ACCFILE))
 
 print("== add")
+first = f"before-add {int(time.time())}"
+send(first)
+time.sleep(2)
 msg, kind = save(new_account())
 check("account saved", kind == "confirmation", f"{kind}: {msg}")
-rc = open(RCFILE).read() if os.path.exists(RCFILE) else ""
-check("getmail file written", "server = mailhub-fakeprovider" in rc and "delete = false" in rc, rc)
-check("new account gets its own folder, named after the address", f'override = "admin+{EMAIL}"@mailhub' in rc, rc)
-check("getmail file is private", os.path.exists(RCFILE) and oct(os.stat(RCFILE).st_mode & 0o777) == "0o600")
+acc = json.load(open(ACCFILE)) if os.path.exists(ACCFILE) else {}
+check("account file written", acc.get("imap_host") == PROVIDER and acc.get("email") == EMAIL, str(acc)[:200])
+check("account file is private", os.path.exists(ACCFILE) and oct(os.stat(ACCFILE).st_mode & 0o777) == "0o600")
 idents = req({"_task": "settings", "_action": "identities"})
 check("identity created", EMAIL in idents)
 iid = re.search(r'id="rcmrow(\d+)"[^>]*>(?:(?!</tr>).)*' + re.escape(EMAIL), idents, re.S)
@@ -90,44 +135,57 @@ if iid:
     form = req({"_task": "settings", "_action": "edit-identity", "_iid": iid.group(1), "_framed": 1})
     check("identity sends through the provider's SMTP", "mailhub-fakeprovider:3025" in form)
 
-print("== fetch")
-m = EmailMessage()
-m["From"], m["To"], m["Subject"] = "dave@other.test", EMAIL, f"accounts-test {int(time.time())}"
-m.set_content("Fetched by an account added from Settings.")
-with smtplib.SMTP(PROVIDER, 3025) as s:
-    s.send_message(m)
-found = False
-for _ in range(12):  # the fetcher wakes within ~5 s of the new file
-    time.sleep(5)
-    with imaplib.IMAP4("mailhub-imap", 31143) as imap:
-        imap.login(USER, PASSWORD)
-        imap.select(f'"{EMAIL}"', readonly=True)
-        typ, data = imap.search(None, "SUBJECT", f'"{m["Subject"]}"')
-        if data[0].split():
-            found = True
-            break
-check(f"mail filed in the {EMAIL} folder", found)
-html = page()
-check("status shows the last fetch", "Last fetch" in html and "OK" in html)
-
-print("== edit")
-msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][delete]": "1"})
+print("== mirror")
+check(f"message already at the provider copied to {LIVE}", bool(find(LIVE, first)))
+with local() as imap:
+    subs = b" ".join(imap.lsub('""', "*")[1] or [])
+check("Live folder subscribed (shows in the webmail)", LIVE.encode() in subs, subs[:300])
+later = f"after-add {int(time.time())}"
+send(later)
+msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed"})  # a save wakes the mirror
 check("edit saved", kind == "confirmation", f"{kind}: {msg}")
-check("delete at source ignored (IMAP only, never deletes)", "delete = false" in open(RCFILE).read()
-      and "delete = true" not in open(RCFILE).read())
-check("no delete option on the page", "_delete" not in page())
+check("new message at the provider arrives after a save", bool(find(LIVE, later, tries=12)))
+check("All inboxes shows it", bool(find("Virtual/All inboxes", later, tries=6)))
+html = page()
+status = re.findall(r"(?:Last sync|Syncing)[^<]{0,160}", html)
+check("status shows the last sync, OK", bool(status) and "OK" in status[0] and "FAILED" not in status[0], status[:1])
 check("identity renamed", "Carol Renamed" in req({"_task": "settings", "_action": "identities"}))
 
-print("== folder is no longer a setting")
-check("no Folder field on the page", "_folder" not in page())
-msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][folder]": "Contact"})
-check("a posted folder is ignored", kind == "confirmation" and f'override = "admin+{EMAIL}"@mailhub' in open(RCFILE).read())
+print("== replay")
+with local() as imap:
+    if imap.select(f'"{LIVE}"')[0] == "OK":
+        uids = imap.uid("SEARCH", None, "SUBJECT", f'"{later}"')[1][0].split()
+        if uids:
+            imap.uid("STORE", uids[-1], "+FLAGS", r"(\Flagged)")
+flagged = False
+for _ in range(15):
+    time.sleep(2)
+    with provider() as p:
+        p.select("INBOX", readonly=True)
+        if p.search(None, "FLAGGED", "SUBJECT", f'"{later}"')[1][0].split():
+            flagged = True
+            break
+check("flag set here is set at the provider", flagged)
 
 print("== remove")
+with provider() as p:
+    before = int(p.select("INBOX", readonly=True)[1][0])
 msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][remove]": "1"})
 check("remove saved", kind == "confirmation", f"{kind}: {msg}")
-check("getmail file gone", not os.path.exists(RCFILE))
-check("identity kept", EMAIL in req({"_task": "settings", "_action": "identities"}))
+check("account file gone", not os.path.exists(ACCFILE))
+gone = False
+for _ in range(20):
+    time.sleep(3)
+    with local() as imap:
+        if not [l for l in (imap.list('""', f"Live/{EMAIL}*")[1] or []) if l]:
+            gone = True
+            break
+check("local copy deleted", gone)
+with provider() as p:
+    after = int(p.select("INBOX", readonly=True)[1][0])
+check("the provider keeps every message", after == before, f"{before} -> {after}")
+check("identity kept", "Carol Renamed" in req({"_task": "settings", "_action": "identities"}))
 
-print("\n" + ("ALL PASSED" if not failures else f"{len(failures)} FAILED: {failures}"))
+print()
+print("ALL PASSED" if not failures else f"{len(failures)} FAILED: {failures}")
 sys.exit(1 if failures else 0)
