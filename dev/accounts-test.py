@@ -3,7 +3,7 @@
 1. refused: invalid address, unreachable IMAP server
 2. add carol@gmail.test (Other provider = GreenMail, unencrypted) → getmail file, identity + SMTP
 3. a mail sent to carol at the provider reaches the MailHub inbox within seconds
-4. the page shows the fetch status; edit (name, delete at source); remove
+4. the page shows the fetch status; edit (name; a posted delete-at-source is ignored, IMAP only); remove
 
 Run inside a container on mailhub-internal that sees the accounts folder at /config,
 e.g. mailhub-fetch:  python accounts-test.py <mailbox password>
@@ -113,7 +113,9 @@ check("status shows the last fetch", "Last fetch" in html and "OK" in html)
 print("== edit")
 msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][delete]": "1"})
 check("edit saved", kind == "confirmation", f"{kind}: {msg}")
-check("delete at source on", "delete = true" in open(RCFILE).read())
+check("delete at source ignored (IMAP only, never deletes)", "delete = false" in open(RCFILE).read()
+      and "delete = true" not in open(RCFILE).read())
+check("no delete option on the page", "_delete" not in page())
 check("identity renamed", "Carol Renamed" in req({"_task": "settings", "_action": "identities"}))
 
 print("== own folder")

@@ -16,7 +16,8 @@ while true; do
     # delivered. Without it getmail saves the record only when the account's run
     # ends, so a restart during a long first fetch (an app update) re-delivers
     # everything already fetched — thousands of duplicates on a big mailbox.
-    out=$(getmail --getmaildir /state --rcfile "$rc" --to-oldmail-on-each-mail 2>&1)
+    # --dont-delete: the provider keeps every message, whatever the account file says.
+    out=$(getmail --getmaildir /state --rcfile "$rc" --to-oldmail-on-each-mail --dont-delete 2>&1)
     code=$?
     printf '%s\n' "$out" | sed "s/^/[$name] /"
     msg=$(printf '%s' "$out" | tail -n 1 | sed 's/\\/\\\\/g; s/"/\\"/g')

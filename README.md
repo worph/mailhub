@@ -40,7 +40,7 @@ version is published upstream), on a push to main that changes that file or by h
 - **`plugins/mailhub_accounts/`**: *Settings → Mail accounts*. Adding an address (Gmail, Namecheap Private
   Email, or any IMAP/SMTP provider) tests the IMAP and SMTP logins, writes its getmail file, and creates its
   identity with the provider's SMTP in identity_smtp's format, in one save. Each account shows its last
-  fetch; it can be renamed, switched to delete-at-source, given a new app password, or removed (fetching
+  fetch; it can be renamed, given a new app password, or removed (fetching
   stops; mail and identity stay). Hand-written getmail files are listed read-only. Settings:
   `mailhub_accounts_dir` (`/var/mailhub/accounts`), `mailhub_fetch_state_dir` (`/var/mailhub/fetch`),
   `mailhub_lmtp_host` / `_port` (`mailhub-imap:2424`), `mailhub_lmtp_user` (the IMAP login).
