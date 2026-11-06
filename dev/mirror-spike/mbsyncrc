@@ -1,0 +1,31 @@
+# SPIKE 2026-11-06, option A: pull-only mirror of each provider account into a
+# local Maildir that Dovecot shows as Live/<address>/. Nothing here writes to the
+# provider: Sync Pull only. Local actions reach the provider through the replay.
+IMAPAccount contact
+Host mail.privateemail.com
+Port 993
+TLSType IMAPS
+User contact@aptero.co
+PassCmd "cat /mirror/contact.pass"
+CertificateFile /etc/ssl/certs/ca-certificates.crt
+PipelineDepth 10
+
+IMAPStore contact-remote
+Account contact
+
+MaildirStore contact-local
+Path /srv/vmail/admin/live/contact/
+Inbox /srv/vmail/admin/live/contact/INBOX
+SubFolders Verbatim
+
+Channel contact
+Far :contact-remote:
+Near :contact-local:
+Patterns *
+Create Near
+Remove None
+Expunge Near
+Sync Pull
+# state lives inside each local folder: wiping a folder wipes its state too
+SyncState *
+CopyArrivalDate yes

@@ -189,7 +189,7 @@ passing with Dovecot as vmail again.
 
 ## Live and virtual folders in Roundcube (2026-11-06)
 
-Roundcube showing what Cypht shows, through Dovecot alone (config: `dev/live-spike.conf.example`):
+Roundcube showing what Cypht shows, through Dovecot alone (first try, live imapc; superseded by the mirror in `dev/mirror-spike/`):
 `Live/contact@aptero.co/…` is the provider's mailbox live (imapc), `Virtual/All inboxes`,
 `Unread`, `Flagged` combine local and live folders (virtual plugin). Measured with contact@ (12,616 messages):
 
