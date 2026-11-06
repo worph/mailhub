@@ -9,11 +9,14 @@
 #  - the private bridge of cypht-gateway (github.com/ashanzzz/cypht-gateway), which lets the gateway
 #    and its MCP server use the accounts configured here. Enabled with `api_login,gateway` in CYPHT_MODULES.
 ARG CYPHT_VERSION=2.13.1
-ARG CYPHT_GATEWAY_VERSION=0.6.0
+# cypht-gateway 0.6.0 by commit: upstream deleted its v0.6.0 tag (newest tag is v0.5.2).
+ARG CYPHT_GATEWAY_COMMIT=24440aff402ba0c85f484f5872fd837220be0082
 
 FROM alpine/git:v2.47.2 AS gateway
-ARG CYPHT_GATEWAY_VERSION
-RUN git clone --depth 1 --branch "v${CYPHT_GATEWAY_VERSION}" https://github.com/ashanzzz/cypht-gateway.git /src
+ARG CYPHT_GATEWAY_COMMIT
+RUN git init -q /src && cd /src \
+ && git fetch -q --depth 1 https://github.com/ashanzzz/cypht-gateway.git "${CYPHT_GATEWAY_COMMIT}" \
+ && git checkout -q FETCH_HEAD && test "$(cat VERSION)" = 0.6.0
 
 FROM cypht/cypht:${CYPHT_VERSION}
 

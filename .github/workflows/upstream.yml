@@ -5,7 +5,7 @@ name: Upstream images
 #   ghcr.io/<owner>/snappymail:3.0.0      SnappyMail app. Docker Hub's newest is
 #       v2.38.2.1, without the 3.0.0 security fixes (two unauthenticated SSRFs).
 #       Drop this entry once djmaze/snappymail:v3.0.0 is published.
-#   ghcr.io/<owner>/cypht-gateway:0.6.0   Cypht app (REST API + MCP server).
+#   ghcr.io/<owner>/cypht-gateway:0.6.0   Cypht app (REST API + MCP server), commit 24440aff.
 #       The project publishes no image. amd64 only: a Rust build under QEMU takes hours.
 # A tag here is the upstream version, so re-running rebuilds the same tag.
 
@@ -32,7 +32,8 @@ jobs:
             platforms: linux/amd64,linux/arm64
           - name: cypht-gateway
             version: 0.6.0
-            context: https://github.com/ashanzzz/cypht-gateway.git#v0.6.0
+            # by commit: upstream deleted its v0.6.0 tag (VERSION file says 0.6.0)
+            context: https://github.com/ashanzzz/cypht-gateway.git#24440aff402ba0c85f484f5872fd837220be0082
             file: Dockerfile
             platforms: linux/amd64
     steps:
