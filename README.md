@@ -38,13 +38,14 @@ version is published upstream), on a push to main that changes that file or by h
 - **`plugins/mailhub_dav/`**: loads the calendar and contacts plugins against MailHub's built-in Baïkal,
   or against another CalDAV/CardDAV server set in *Settings → Calendar & contacts* (tested before saving,
   password stored encrypted).
-- **`plugins/mailhub_accounts/`**: *Settings → Mail accounts*. Adding an address (Gmail, Namecheap Private
-  Email, or any IMAP/SMTP provider) tests the IMAP and SMTP logins, writes its mirror account file
-  (`<slug>.json`, 0600) and creates its identity with the provider's SMTP in identity_smtp's format, in one
-  save. Each account shows the mirror's status (download progress while a sync runs); it can be renamed,
-  given a new app password, or removed (the mirror stops and deletes this server's copy; nothing is deleted
-  at the provider, the identity stays). Settings: `mailhub_accounts_dir` (`/var/mailhub/accounts`),
-  `mailhub_mirror_state_dir` (`/var/mailhub/mirror`).
+- **`plugins/mailhub_accounts/`**: *Settings → Mail accounts*, its own entry in the Settings menu (after
+  Identities). One card per account with its live status (refreshed every 15 s: first download count, up to
+  date, or the provider's error) and buttons applied at once: *Sync now*, *Change password*, *Rename*, *Remove…*
+  (confirmation; the mirror stops and deletes this server's copy, nothing is deleted at the provider, the
+  identity stays). *Add an account* opens a dialog: Gmail, Namecheap Private Email or any IMAP/SMTP provider;
+  the IMAP and SMTP logins are tested, then the mirror account file (`<slug>.json`, 0600) and the identity with
+  the provider's SMTP (identity_smtp's format) are written. Settings: `mailhub_accounts_dir`
+  (`/var/mailhub/accounts`), `mailhub_mirror_state_dir` (`/var/mailhub/mirror`).
 - **Skins**: 11 to choose from in *Settings → User interface*, the app's default being
   [Elastic2022](https://github.com/seb1k/Elastic2022): Roundcube's Elastic,
   [Workbench](https://github.com/AR-Sebastian/roundcube-skin-workbench),

@@ -45,16 +45,30 @@ def check(label, ok, detail=""):
 
 
 def page():
-    return req({"_task": "settings", "_action": "edit-prefs", "_section": "mailhub_accounts", "_framed": 1})
+    return req({"_task": "settings", "_action": "plugin.mailhub_accounts"})
 
 
-def save(fields):
-    html = page()
-    data = {"_token": token_of(html), "_section": "mailhub_accounts", "_task": "settings", "_action": "save-prefs"}
-    data.update(fields)
-    out = req({"_task": "settings", "_action": "save-prefs", "_framed": 1}, data)
-    m = re.search(r'display_message\("((?:[^"\\]|\\.)*)","(\w+)"', out)
-    return (m.group(1).encode().decode("unicode_escape"), m.group(2)) if m else ("", "none")
+TOKEN = None
+
+
+def act(op, **fields):
+    """What the page's buttons send: one action, applied at once (no Save)."""
+    global TOKEN
+    TOKEN = TOKEN or token_of(page())
+    data = {"_op": op, "_remote": 1, "_unlock": 0, **fields}
+    r = urllib.request.Request(RC + "?_task=settings&_action=plugin.mailhub_accounts-do&_remote=1",
+                               data=urllib.parse.urlencode(data).encode(), headers={"X-Roundcube-Request": TOKEN})
+    with web.open(r) as resp:
+        out = resp.read().decode("utf-8", "replace")
+    exec_js = json.loads(out).get("exec", "")
+    m = re.search(r'display_message\("((?:[^"\\]|\\.)*)","(\w+)"', exec_js)
+    return (json.loads('"' + m.group(1) + '"'), m.group(2)) if m else (exec_js[:200], "none")
+
+
+def save(fields):  # kept for the shape of the steps below: maps the old form fields to actions
+    if "_new[email]" in fields:
+        return act("add", **fields)
+    raise NotImplementedError(fields)
 
 
 def new_account(**over):
@@ -70,7 +84,8 @@ tok = token_of(req({"_task": "login"}))
 req({"_task": "login", "_action": "login"},
     {"_token": tok, "_task": "login", "_action": "login", "_timezone": "UTC", "_user": USER, "_pass": PASSWORD})
 html = page()
-check("settings page renders", "Add an account" in html and "mh_preset" in html, html[:300])
+check("Mail accounts page renders", "Add an account" in html and "mh_preset" in html, html[:300])
+check("it is a Settings entry of its own", "plugin.mailhub_accounts" in req({"_task": "settings"}))
 check("no Folder or Delete-from-provider option", "_folder" not in html and "_delete" not in html)
 
 
@@ -94,12 +109,27 @@ def send(subject):
         s.send_message(m)
 
 
+def uids_with_subject(imap, subject, last=200):
+    """The newest messages' subjects, read without SEARCH (a full-text search can
+    wait on Dovecot's indexer while a big account is being indexed)."""
+    typ, d = imap.uid("SEARCH", None, "ALL")
+    uids = d[0].split()[-last:] if typ == "OK" else []
+    if not uids:
+        return []
+    typ, d = imap.uid("FETCH", b",".join(uids).decode(), "(BODY.PEEK[HEADER.FIELDS (SUBJECT)])")
+    hits = []
+    for x in d:
+        if isinstance(x, tuple) and subject.encode() in x[1]:
+            hits.append(re.search(rb"UID (\d+)", x[0]).group(1))
+    return hits
+
+
 def find(box, subject, tries=30):
     for _ in range(tries):
         try:
             with local() as imap:
                 if imap.select(f'"{box}"', readonly=True)[0] == "OK":
-                    hits = imap.search(None, "SUBJECT", f'"{subject}"')[1][0].split()
+                    hits = uids_with_subject(imap, subject)
                     if hits:
                         return hits
         except imaplib.IMAP4.error:
@@ -109,7 +139,7 @@ def find(box, subject, tries=30):
 
 
 if SLUG in html:  # left over from an earlier run
-    save({f"_acc[{SLUG}][name]": "x", f"_acc[{SLUG}][remove]": "1"})
+    act("remove", _slug=SLUG)
     time.sleep(10)
 
 print("== refused")
@@ -142,19 +172,22 @@ with local() as imap:
 check("Live folder subscribed (shows in the webmail)", LIVE.encode() in subs, subs[:300])
 later = f"after-add {int(time.time())}"
 send(later)
-msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed"})  # a save wakes the mirror
-check("edit saved", kind == "confirmation", f"{kind}: {msg}")
+msg, kind = act("rename", _slug=SLUG, _name="Carol Renamed")  # any change wakes the mirror
+check("rename applied at once", kind == "confirmation", f"{kind}: {msg}")
+msg, kind = act("syncnow", _slug=SLUG)
+check("Sync now", kind == "confirmation", f"{kind}: {msg}")
 check("new message at the provider arrives after a save", bool(find(LIVE, later, tries=12)))
 check("All inboxes shows it", bool(find("Virtual/All inboxes", later, tries=6)))
+time.sleep(5)
 html = page()
-status = re.findall(r"(?:Last sync|Syncing)[^<]{0,160}", html)
-check("status shows the last sync, OK", bool(status) and "OK" in status[0] and "FAILED" not in status[0], status[:1])
+status = re.findall(r'class="mh-status mh-(\w+)"><span class="mh-dot"></span><span class="mh-status-text">([^<]*)', html)
+check("status shows the sync, up to date", bool(status) and status[0][0] == "ok" and "Up to date" in status[0][1], status[:1])
 check("identity renamed", "Carol Renamed" in req({"_task": "settings", "_action": "identities"}))
 
 print("== replay")
 with local() as imap:
     if imap.select(f'"{LIVE}"')[0] == "OK":
-        uids = imap.uid("SEARCH", None, "SUBJECT", f'"{later}"')[1][0].split()
+        uids = uids_with_subject(imap, later)
         if uids:
             imap.uid("STORE", uids[-1], "+FLAGS", r"(\Flagged)")
 flagged = False
@@ -170,8 +203,8 @@ check("flag set here is set at the provider", flagged)
 print("== remove")
 with provider() as p:
     before = int(p.select("INBOX", readonly=True)[1][0])
-msg, kind = save({f"_acc[{SLUG}][name]": "Carol Renamed", f"_acc[{SLUG}][remove]": "1"})
-check("remove saved", kind == "confirmation", f"{kind}: {msg}")
+msg, kind = act("remove", _slug=SLUG)
+check("Remove applied at once", kind == "confirmation", f"{kind}: {msg}")
 check("account file gone", not os.path.exists(ACCFILE))
 gone = False
 for _ in range(20):
