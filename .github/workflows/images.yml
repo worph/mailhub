@@ -1,6 +1,6 @@
 name: Build images
 
-# Pushes to main and PRs build all three images (no push) so a broken patch or
+# Pushes to main and PRs build all four images (no push) so a broken patch or
 # dependency shows up early. A tag vX.Y.Z publishes them to GHCR as
 # ghcr.io/<owner>/mailhub-<image>:X.Y.Z, the tag the store compose pins.
 
@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [roundcube, getmail, mcp]
+        image: [roundcube, getmail, mcp, cypht]
     steps:
       - uses: actions/checkout@v4
 

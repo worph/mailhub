@@ -1,16 +1,27 @@
 # MailHub images
 
-The custom images behind the **MailHub** Yundera store app: several mail accounts fetched into
-one mailbox, with webmail, calendar, contacts, and an MCP server for AI assistants.
+The custom images behind three Yundera store mail apps: **MailHub** (several mail accounts fetched
+into one mailbox, with webmail, calendar, contacts, and an MCP server for AI assistants), **Cypht**
+(every account live over IMAP, with our invitation and calendar modules) and **SnappyMail** (stock).
 
-The app itself (compose, seeded config, setup script, rationale) lives in the store:
-`Yundera/AppStoreLab` → `Apps/MailHub`. This repo holds only what has to be built into an image.
+The apps themselves (compose, seeded config, setup scripts, rationale) live in the store:
+`Yundera/AppStoreLab` → `Apps/MailHub`, `Apps/Cypht`, `Apps/SnappyMail`. This repo holds only what
+has to be built into an image.
 
 | Image | Folder | What it is |
 |---|---|---|
 | `ghcr.io/worph/mailhub-roundcube` | `roundcube/` | Roundcube + Kolab calendar and address book plugins (CalDAV / CardDAV drivers) + identity_smtp (send through each identity's own provider) + our `mailhub_dav` and `mailhub_accounts` plugins |
 | `ghcr.io/worph/mailhub-getmail` | `getmail/` | getmail6 in a loop: fetches every `/config/*.getmailrc` into Dovecot over LMTP, within ~5 s of a change to that folder, and writes `/state/status/<account>.json`. Runs as uid 33 (the webmail's www-data), which writes the account files |
 | `ghcr.io/worph/mailhub-mcp` | `mcp/` | MCP server over the unified mailbox (IMAP), calendar (CalDAV) and contacts (CardDAV). Read-only unless `MAILHUB_MCP_WRITE=true`; never sends mail |
+| `ghcr.io/worph/mailhub-cypht` | `cypht/` | Official Cypht image + `mailhub_invites` (Accept / Maybe / Decline, written to CalDAV, reply to the organizer), `mailhub_calendar` (CalDAV calendar page, FullCalendar), cypht-gateway's bridge module, TLS certificate checks for public mail servers, no Xdebug. Used by the Cypht app |
+
+Built by `.github/workflows/upstream.yml`, **unchanged** from an upstream tag (no image of that
+version is published upstream), on a push to main that changes that file or by hand (Run workflow):
+
+| Image | Upstream | Why |
+|---|---|---|
+| `ghcr.io/worph/snappymail:3.0.0` | the-djmaze/snappymail `v3.0.0`, `.docker/release/Dockerfile` | Docker Hub stops at v2.38.2.1, without 3.0.0's security fixes. Drop once `djmaze/snappymail:v3.0.0` exists |
+| `ghcr.io/worph/cypht-gateway:0.6.0` | ashanzzz/cypht-gateway `v0.6.0` | The project publishes no image. amd64 only (Rust under QEMU is too slow) |
 
 ## roundcube
 

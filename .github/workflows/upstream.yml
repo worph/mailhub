@@ -1,0 +1,62 @@
+name: Upstream images
+
+# Upstream projects with no published image we can pin, built UNCHANGED from a
+# release tag and pushed under our name. The store apps pin these tags:
+#   ghcr.io/<owner>/snappymail:3.0.0      SnappyMail app. Docker Hub's newest is
+#       v2.38.2.1, without the 3.0.0 security fixes (two unauthenticated SSRFs).
+#       Drop this entry once djmaze/snappymail:v3.0.0 is published.
+#   ghcr.io/<owner>/cypht-gateway:0.6.0   Cypht app (REST API + MCP server).
+#       The project publishes no image. amd64 only: a Rust build under QEMU takes hours.
+# A tag here is the upstream version, so re-running rebuilds the same tag.
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/upstream.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: snappymail
+            version: 3.0.0
+            context: https://github.com/the-djmaze/snappymail.git#v3.0.0
+            file: .docker/release/Dockerfile
+            platforms: linux/amd64,linux/arm64
+          - name: cypht-gateway
+            version: 0.6.0
+            context: https://github.com/ashanzzz/cypht-gateway.git#v0.6.0
+            file: Dockerfile
+            platforms: linux/amd64
+    steps:
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: ${{ matrix.platforms }}
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}:${{ matrix.version }}
+          # source = this repo, so the package is linked to it (and its visibility);
+          # where the code comes from is in the description.
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=Unchanged build of ${{ matrix.context }}
+            org.opencontainers.image.version=${{ matrix.version }}
+          provenance: false

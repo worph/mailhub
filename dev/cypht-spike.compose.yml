@@ -142,7 +142,7 @@ services:
     mem_limit: 128m
     expose: [9099]
     environment:
-      BEACONIFY_NAME: cypht
+      BEACONIFY_NAME: cyphtspike
       BEACONIFY_DESCRIPTION: "Cypht (spike) — every mail account configured in Cypht: list, search, read (via cypht-gateway)"
       BEACONIFY_UPSTREAM_URL: http://cypht-spike-mcp:8790/mcp
       BEACONIFY_AUTH: "Bearer ${CYPHT_GATEWAY_PAT:-}"
