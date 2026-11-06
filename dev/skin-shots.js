@@ -6,7 +6,7 @@
 const puppeteer = require('puppeteer');
 
 const RC = process.env.RC_URL || 'http://mailhub-webmail/';
-const SKINS = (process.env.SKINS || 'elastic,workbench,elastic2022').split(',');
+const SKINS = (process.env.SKINS || 'elastic2022,elastic,workbench,elastic2025,stretchedelastic,outlook,air,airblue,elasticgoogle,hellomail,accessibility').split(',');
 const PAGES = {
   mail: '?_task=mail&_mbox=INBOX',
   calendar: '?_task=calendar',
@@ -21,11 +21,11 @@ const PAGES = {
   await page.goto(RC + '?_task=login', { waitUntil: 'networkidle0' });
   await page.type('#rcmloginuser', 'admin');
   await page.type('#rcmloginpwd', process.env.MAILHUB_PASSWORD);
-  await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('#rcmloginsubmit')]);
+  await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.click('#rcmloginsubmit')]);
 
   for (const skin of SKINS) {
     // Save the skin the way Settings → User interface does.
-    await page.goto(RC + '?_task=settings&_action=edit-prefs&_section=general&_framed=1', { waitUntil: 'networkidle0' });
+    await page.goto(RC + '?_task=settings&_action=edit-prefs&_section=general&_framed=1', { waitUntil: 'load' });
     const saved = await page.evaluate(async (skin) => {
       const form = document.querySelector('form');
       const data = new FormData(form);
@@ -34,8 +34,8 @@ const PAGES = {
       return res.status;
     }, skin);
     for (const [name, path] of Object.entries(PAGES)) {
-      await page.goto(RC + path, { waitUntil: 'networkidle0' });
-      await new Promise((r) => setTimeout(r, 1500)); // calendar renders after load
+      await page.goto(RC + path, { waitUntil: 'load' }); // Outlook never goes network-idle
+      await new Promise((r) => setTimeout(r, 3000)); // calendar renders after load
       const used = await page.evaluate(() => (window.rcmail && rcmail.env.skin) || '?');
       await page.screenshot({ path: `shot-${skin}-${name}.png` });
       console.log(`${skin} ${name}: saved=${saved} skin-in-use=${used}`);

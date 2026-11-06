@@ -49,9 +49,19 @@ version is published upstream), on a push to main that changes that file or by h
   files user+detail into the detail's folder (`lmtp_save_to_detail_mailbox`), the quoted local part lets the
   folder carry an `@`, and `auth_username_format` drops the domain so it is still user `admin` (both set in
   the store's `dovecot/mailhub.conf`). The *saving* message shows while logins are checked.
-- **Skins**: [Workbench](https://github.com/AR-Sebastian/roundcube-skin-workbench) (the app's default) and
-  [Elastic2022](https://github.com/seb1k/Elastic2022), both CC BY-SA 3.0 like Elastic, pinned by tag in the
-  Dockerfile; anyone can switch in *Settings → User interface*. `dev/skin-shots.js` screenshots each skin.
+- **Skins**: 11 to choose from in *Settings → User interface*, the app's default being
+  [Elastic2022](https://github.com/seb1k/Elastic2022): Roundcube's Elastic,
+  [Workbench](https://github.com/AR-Sebastian/roundcube-skin-workbench),
+  [Elastic2025](https://github.com/bijanbina/Elastic2025),
+  [Stretched Elastic](https://github.com/johndoh/roundcube-stretchedelastic),
+  [Outlook](https://github.com/theaustinayers/Outlook-Skin-for-RoundCube),
+  [Air and Air Blue](https://github.com/skive/roundcube-air-skin),
+  [Elastic Google](https://github.com/nyouaku/elastic-google), [hellomail](https://github.com/dcwq/hellomail)
+  and [Elastic Accessibility](https://github.com/nicolas-joubert/roundcube-skins-elastic-accessibility).
+  All CC BY-SA 3.0 or GPL-3.0, pinned by tag or commit in the Dockerfile. Outlook and Air are full Elastic
+  copies rather than `extends: elastic`, so the Dockerfile links each plugin's Elastic templates for them
+  (without it the calendar says "File not found"). Tried and left out: Ultimate Gmail (ships unbuilt, renders
+  unstyled) and Larry (not responsive). `dev/skin-shots.js` screenshots each skin (mail, calendar, settings).
 - **`post-setup/10-plugin-schemas.php`**: creates and upgrades the plugins' database tables (the official
   image only handles Roundcube's own), with a fix for libkolab's duplicate SQLite index name.
 
