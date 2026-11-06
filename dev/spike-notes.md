@@ -186,3 +186,27 @@ passing with Dovecot as vmail again.
   of duplicates. Fix: `--to-oldmail-on-each-mail` in run.sh (record after every message). Checked on wisera:
   400 messages, container restarted after 122, result 400 messages / 400 distinct Message-IDs (126 skipped,
   274 fetched after the restart).
+
+## Live and virtual folders in Roundcube (2026-11-06)
+
+Roundcube showing what Cypht shows, through Dovecot alone (config: `dev/live-spike.conf.example`):
+`Live/contact@aptero.co/…` is the provider's mailbox live (imapc), `Virtual/All inboxes`,
+`Unread`, `Flagged` combine local and live folders (virtual plugin). Measured with contact@ (12,616 messages):
+
+| | Result |
+|---|---|
+| Folder tree, unread counts in Roundcube | ✅ both groups listed, counts shown |
+| Live INBOX: SELECT / SORT by date | 0.7 s / 0.6 s |
+| Live INBOX: subject or full-text SEARCH | 0.2 s (passed to the provider) |
+| Live INBOX: open a message | 0.4 s |
+| Virtual Unread / Flagged (explicit folder lists) | first build ~20 s, then ~2 s |
+| Virtual All inboxes, every message | ❌ first build still running after 10 min (12.6k live messages) |
+| Virtual All inboxes, last 30 days (`younger 2592000`) | first build 229 s, then 2 s; 1,372 messages; SELECT 1.4 s, SORT 1.2 s |
+| Search inside a virtual folder | ❌ subject search returned 0 (wrong), full-text ran > 8 min (Dovecot evaluates it locally, fetching bodies) |
+
+Gotchas: virtual namespace needs `mailbox_list_layout = fs` (the global `index` layout is refused,
+and LMTP deliveries fail while the config is invalid); wildcards (`*`, `Live/*`) in dovecot-virtual
+do not match the imapc namespace; full-text indexing must stay off for the user (as in spike B).
+**PrivateEmail allows 20 connections per user+IP**: every Roundcube request is a new IMAP session and
+each opens its own imapc connection, so parallel requests plus the box's other clients hit
+`[LIMIT] Maximum number of connections` (seen once during tests).
