@@ -1,8 +1,9 @@
 name: Build images
 
-# Pushes to main and PRs build all four images (no push) so a broken patch or
+# Pushes to main and PRs build the mirror, mcp and cypht images (no push) so a broken patch or
 # dependency shows up early. A tag vX.Y.Z publishes them to GHCR as
 # ghcr.io/<owner>/mailhub-<image>:X.Y.Z, the tag the store compose pins.
+# mailhub-roundcube is built in its own repo, worph/mailhub-roundcube.
 
 on:
   push:
@@ -21,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [roundcube, mirror, mcp, cypht]
+        image: [mirror, mcp, cypht]
     steps:
       - uses: actions/checkout@v4
 
