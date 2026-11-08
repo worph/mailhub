@@ -5,15 +5,18 @@ into one mailbox, with webmail, calendar, contacts, and an MCP server for AI ass
 (every account live over IMAP, with our invitation and calendar modules) and **SnappyMail** (stock).
 
 The apps themselves (compose, seeded config, setup scripts, rationale) live in the store:
-`Yundera/AppStore` → `Apps/MailHub`, `Apps/Cypht`, `Apps/SnappyMail`. This repo holds only what
-has to be built into an image. MailHub's webmail image, `ghcr.io/worph/mailhub-roundcube`, has its own repo
-since 0.4.0: [worph/mailhub-roundcube](https://github.com/worph/mailhub-roundcube) (history kept there).
+`Yundera/AppStore` → `Apps/MailHub`, `Apps/Cypht`, `Apps/SnappyMail`. This repo holds the Cypht image,
+the stock-upstream builds and the test kit. MailHub's own images have their own repos (history kept there):
+
+| Image | Repo | Since |
+|---|---|---|
+| `ghcr.io/worph/mailhub-roundcube` | [worph/mailhub-roundcube](https://github.com/worph/mailhub-roundcube): the webmail, Kolab calendar and contacts, Settings → Mail accounts | 0.4.1 |
+| `ghcr.io/worph/mailhub-mirror` | [worph/mailhub-mirror](https://github.com/worph/mailhub-mirror): every provider mailbox as a local copy, actions replayed at the provider, the Merged views | 0.4.2 |
+| `ghcr.io/worph/mailhub-mcp` | [worph/mailhub-mcp](https://github.com/worph/mailhub-mcp): MCP server over the mailbox, calendar and contacts | 0.4.2 |
 
 | Image | Folder | What it is |
 |---|---|---|
-| `ghcr.io/worph/mailhub-mirror` | `mirror/` | Every provider mailbox as a local copy under `Live/<address>/`: mbsync pull only (nothing in that direction writes to the provider), the IMAP actions done there (recorded by the store's Dovecot Lua hook) replayed at the provider as the same commands, `Merged/All inboxes`, `Unread`, `Flagged` regenerated from the accounts and folders that exist (an account can be left out of them), a status per account for Settings → Mail accounts. Replaced getmail in the app with 0.4.0 |
 | `ghcr.io/worph/mailhub-getmail` | `getmail/` | (before 0.4.0) getmail6 in a loop, copying each provider's INBOX into Dovecot over LMTP. No longer used by the app nor built by CI |
-| `ghcr.io/worph/mailhub-mcp` | `mcp/` | MCP server over the unified mailbox (IMAP), calendar (CalDAV) and contacts (CardDAV). Read-only unless `MAILHUB_MCP_WRITE=true`; never sends mail |
 | `ghcr.io/worph/mailhub-cypht` | `cypht/` | Official Cypht image + `mailhub_invites` (Accept / Maybe / Decline, written to CalDAV, reply to the organizer), `mailhub_calendar` (CalDAV calendar page, FullCalendar), cypht-gateway's bridge module, TLS certificate checks for public mail servers, no Xdebug. Used by the Cypht app |
 
 Built by `.github/workflows/upstream.yml`, **unchanged** from an upstream tag (no image of that
@@ -23,15 +26,6 @@ version is published upstream), on a push to main that changes that file or by h
 |---|---|---|
 | `ghcr.io/worph/snappymail:3.0.0` | the-djmaze/snappymail `v3.0.0`, `.docker/release/Dockerfile` | Docker Hub stops at v2.38.2.1, without 3.0.0's security fixes. Drop once `djmaze/snappymail:v3.0.0` exists |
 | `ghcr.io/worph/cypht-gateway:0.6.0` | ashanzzz/cypht-gateway `v0.6.0` | The project publishes no image. amd64 only (Rust under QEMU is too slow) |
-
-## mcp
-
-Settings: `MAILHUB_PASSWORD` (required), `MAILHUB_USER` (`admin`), `MAILHUB_IMAP_HOST` / `_PORT`
-(`mailhub-imap:31143`), `MAILHUB_DAV_URL` (`http://mailhub-dav/dav.php`), `MAILHUB_ROUNDCUBE_DB`
-(`/roundcube/sqlite.db`, read for the sending identities), `MAILHUB_TZ`, `MAILHUB_MCP_WRITE`, `PORT` (8080).
-Serves stateless streamable HTTP on `/mcp`. In the app, a beaconify sidecar announces it to Beacon.
-
-`python mcp/check_tools.py` checks that it registers 7 tools (13 with `MAILHUB_MCP_WRITE=true`).
 
 ## dev
 
@@ -44,7 +38,7 @@ send as an address through its own SMTP (`send-as-test.py`), and call the MCP to
 
 ## Releasing
 
-CI builds the mirror, mcp and cypht images (amd64 + arm64) on every push and PR, and checks the MCP tool count.
-Pushing a tag `vX.Y.Z` publishes them as `ghcr.io/worph/mailhub-<image>:X.Y.Z`; then bump the mirror and mcp
-tags in the store's `Apps/MailHub/docker-compose.yml`. After the first release, make the GHCR
-packages public (GitHub → Packages → package settings) so boxes can pull them without credentials.
+CI builds the cypht image (amd64 + arm64) on every push and PR. Pushing a tag `vX.Y.Z` publishes it as
+`ghcr.io/worph/mailhub-cypht:X.Y.Z`; then bump its tag in the store's `Apps/Cypht/docker-compose.yml`.
+After the first release, make the GHCR package public (GitHub → Packages → package settings) so boxes can
+pull it without credentials.

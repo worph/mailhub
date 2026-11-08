@@ -1,9 +1,10 @@
 name: Build images
 
-# Pushes to main and PRs build the mirror, mcp and cypht images (no push) so a broken patch or
-# dependency shows up early. A tag vX.Y.Z publishes them to GHCR as
-# ghcr.io/<owner>/mailhub-<image>:X.Y.Z, the tag the store compose pins.
-# mailhub-roundcube is built in its own repo, worph/mailhub-roundcube.
+# Pushes to main and PRs build the cypht image (no push) so a broken patch or
+# dependency shows up early. A tag vX.Y.Z publishes it to GHCR as
+# ghcr.io/<owner>/mailhub-cypht:X.Y.Z, the tag the store compose pins.
+# MailHub's own images are built in their own repos: worph/mailhub-roundcube,
+# worph/mailhub-mirror, worph/mailhub-mcp.
 
 on:
   push:
@@ -22,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [mirror, mcp, cypht]
+        image: [cypht]
     steps:
       - uses: actions/checkout@v4
 
@@ -58,17 +59,3 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
-  mcp-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - run: pip install mcp==2.3.0 httpx==0.28.1 icalendar==7.3.0 vobject==0.9.9
-      - name: Read-only mode registers 7 tools
-        run: python mcp/check_tools.py
-        env: { MAILHUB_PASSWORD: dummy }
-      - name: Write mode registers 13 tools
-        run: python mcp/check_tools.py
-        env: { MAILHUB_PASSWORD: dummy, MAILHUB_MCP_WRITE: 'true' }
