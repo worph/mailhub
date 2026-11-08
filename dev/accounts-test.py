@@ -6,7 +6,9 @@
 3. a message already at the provider is copied to Live/carol@gmail.test/INBOX; a new one arrives
    after a save on the page (which wakes the mirror); All inboxes shows it; the status says so
 4. replay: flagging the local copy flags the message at the provider
-5. remove: the local copy is deleted, the provider keeps every message
+5. Keep out of Merged: the account leaves Merged/All inboxes (and Unread, Flagged), its mail
+   still arrives in Live; Show in Merged puts it back
+6. remove: the local copy is deleted, the provider keeps every message
 
 Run inside mailhub-mirror (it sees the account files at /accounts):
     docker exec mailhub-mirror python3 /tmp/accounts-test.py <mailbox password>
@@ -157,6 +159,7 @@ msg, kind = save(new_account())
 check("account saved", kind == "confirmation", f"{kind}: {msg}")
 acc = json.load(open(ACCFILE)) if os.path.exists(ACCFILE) else {}
 check("account file written", acc.get("imap_host") == PROVIDER and acc.get("email") == EMAIL, str(acc)[:200])
+check("a new account shows in Merged", acc.get("in_views") is True, str(acc.get("in_views")))
 check("account file is private", os.path.exists(ACCFILE) and oct(os.stat(ACCFILE).st_mode & 0o777) == "0o600")
 idents = req({"_task": "settings", "_action": "identities"})
 check("identity created", EMAIL in idents)
@@ -177,7 +180,7 @@ check("rename applied at once", kind == "confirmation", f"{kind}: {msg}")
 msg, kind = act("syncnow", _slug=SLUG)
 check("Sync now", kind == "confirmation", f"{kind}: {msg}")
 check("new message at the provider arrives after a save", bool(find(LIVE, later, tries=12)))
-check("All inboxes shows it", bool(find("Virtual/All inboxes", later, tries=6)))
+check("All inboxes shows it", bool(find("Merged/All inboxes", later, tries=6)))
 time.sleep(5)
 html = page()
 status = re.findall(r'class="mh-status mh-(\w+)"><span class="mh-dot"></span><span class="mh-status-text">([^<]*)', html)
@@ -199,6 +202,34 @@ for _ in range(15):
             flagged = True
             break
 check("flag set here is set at the provider", flagged)
+
+print("== keep out of Merged")
+VIEW = "/srv/vmail/admin/virtual/All inboxes/dovecot-virtual"  # written by mailhub-mirror
+
+
+def view_has_account(want, tries=10):
+    for _ in range(tries):
+        if (f"Live/{EMAIL}/INBOX" in open(VIEW).read()) == want:
+            return True
+        time.sleep(2)
+    return False
+
+
+check("All inboxes covers the account", view_has_account(True, 1))
+msg, kind = act("unmerge", _slug=SLUG)
+check("Keep out of Merged applied at once", kind == "confirmation", f"{kind}: {msg}")
+check("account file says so", json.load(open(ACCFILE)).get("in_views") is False)
+check("the card says so", "kept out of Merged" in page() and 'data-op="merge"' in page())
+check("All inboxes no longer covers it", view_has_account(False))
+apart = f"kept-apart {int(time.time())}"
+send(apart)
+act("syncnow", _slug=SLUG)
+check("its mail still arrives in Live", bool(find(LIVE, apart, tries=12)))
+check("but not in Merged/All inboxes", not find("Merged/All inboxes", apart, tries=1))
+msg, kind = act("merge", _slug=SLUG)
+check("Show in Merged applied at once", kind == "confirmation", f"{kind}: {msg}")
+check("All inboxes covers it again", view_has_account(True))
+check("and shows its mail", bool(find("Merged/All inboxes", apart, tries=6)))
 
 print("== remove")
 with provider() as p:
