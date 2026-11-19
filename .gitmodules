@@ -1,0 +1,12 @@
+[submodule "mailhub-mcp"]
+	path = mailhub-mcp
+	url = https://github.com/worph/mailhub-mcp.git
+[submodule "mailhub_collect"]
+	path = mailhub_collect
+	url = https://github.com/worph/mailhub_collect.git
+[submodule "mailhub-roundcube"]
+	path = mailhub-roundcube
+	url = https://github.com/worph/mailhub-roundcube.git
+[submodule "mailhub-mirror"]
+	path = mailhub-mirror
+	url = https://github.com/worph/mailhub-mirror.git
